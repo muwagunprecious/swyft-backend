@@ -28,7 +28,7 @@ export const sendTicketEmail = async ({
 }) => {
   try {
     const data = await resend.emails.send({
-      from: 'OTIX <tickets@otix.example.com>',
+      from: 'OTIX <onboarding@resend.dev>',
       to: [email],
       subject: `Your OTIX Ticket & Receipt: ${eventName}`,
       html: `
@@ -118,7 +118,7 @@ export const sendTicketEmail = async ({
 export const sendVerificationEmail = async (email: string, name: string, code: string) => {
   try {
     const data = await resend.emails.send({
-      from: 'OTIX <verify@otix.example.com>',
+      from: 'OTIX <onboarding@resend.dev>',
       to: [email],
       subject: 'Verify your OTIX Account',
       html: `
@@ -139,7 +139,8 @@ export const sendVerificationEmail = async (email: string, name: string, code: s
     });
     return data;
   } catch (error) {
-    console.error('Error sending verification email', error);
-    throw error;
+    console.error('Error sending verification email (non-fatal):', error);
+    // Do NOT rethrow — email failure must never block account creation
+    return null;
   }
 };
