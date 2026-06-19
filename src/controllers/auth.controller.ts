@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
-import { sendVerificationEmail } from '../services/email.service';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -23,15 +22,12 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Generate 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const userId = globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2) + Date.now().toString(36);
 
-    // Create user
+    // Create user (auto-verified — email verification disabled)
     const { data: user, error } = await supabase
       .from('User')
       .insert({
@@ -42,8 +38,7 @@ export const register = async (req: Request, res: Response) => {
         role: role || 'STUDENT',
         matricNumber,
         university: university || null,
-        verificationCode,
-        isVerified: false,
+        isVerified: true,
         updatedAt: new Date(),
       })
       .select()
@@ -51,13 +46,8 @@ export const register = async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    // Send verification email
-    await sendVerificationEmail(email, name, verificationCode).catch(err => 
-      console.error('Failed to send verification email:', err)
-    );
-
     res.status(201).json({ 
-      message: 'Account Created! Please check your email to verify your account.', 
+      message: 'Account created successfully! You can now log in.', 
       userId: user.id 
     });
   } catch (error: any) {
