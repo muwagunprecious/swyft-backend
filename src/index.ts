@@ -39,6 +39,11 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'OK', message: 'OTIX API is running' });
 });
 
+// Root Route
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'OK', message: 'Welcome to OTIX Backend API' });
+});
+
 // Start Server
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   app.listen(PORT, () => {
