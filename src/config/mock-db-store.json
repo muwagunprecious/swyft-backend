@@ -1,0 +1,1482 @@
+{
+  "User": [
+    {
+      "id": "admin-user-id",
+      "email": "admin@otix.com",
+      "password": "$2a$10$r0HVkrpDw0ev.ohhfDptKeFzvHfPbDyqnnCo3ia9Be2J2IZvB7G4W",
+      "name": "Ago-Iwoye",
+      "role": "ADMIN",
+      "university": "OOU",
+      "isVerified": true,
+      "createdAt": "2026-06-15T18:10:30.672Z",
+      "updatedAt": "2026-06-15T18:17:43.117Z",
+      "phone": "09023323399"
+    },
+    {
+      "id": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "email": "professorprecious03@gmail.com",
+      "name": "Test Attendee",
+      "password": "$2a$10$Ovd.76/xKecPPMzQHfxzYOOVMXeGgt8NfUfWSxT8DRb.plelS8Q12",
+      "role": "STUDENT",
+      "university": "OOU",
+      "isVerified": true,
+      "phone": "09023323399",
+      "matricNumber": null,
+      "updatedAt": "2026-06-16T12:25:31.892Z",
+      "createdAt": "2026-06-15T18:49:14.851Z"
+    },
+    {
+      "id": "c66b5ed4-f3e8-40ab-a980-91b1e291da1e",
+      "email": "ademuwgun@gmail.com",
+      "password": "$2a$12$nxHwZccK2AO42uW5aWbyAu8Dw9iQCmoOYlVXsxtsbAr1qBD8DCNDi",
+      "name": "Ademuwagun Precious",
+      "role": "ORGANIZER",
+      "matricNumber": null,
+      "verificationCode": "731527",
+      "isVerified": false,
+      "updatedAt": "2026-06-16T13:35:27.056Z",
+      "createdAt": "2026-06-16T13:35:27.056Z"
+    },
+    {
+      "id": "f4ed0afc-ba4c-44ac-9434-93ad38e393a2",
+      "email": "ademuwagunremi60@gmail.com",
+      "password": "$2a$12$NQAIrJDktJBQYymHQVPVReopVXppZ8RaFuRGxMMW8uIPFk/Wn4KH2",
+      "name": "Emmanuel Agida",
+      "role": "ORGANIZER",
+      "matricNumber": null,
+      "verificationCode": "708303",
+      "isVerified": false,
+      "updatedAt": "2026-06-16T22:48:35.373Z",
+      "createdAt": "2026-06-16T14:43:31.150Z",
+      "phone": "09023323399",
+      "university": "OOU"
+    },
+    {
+      "id": "4b29b133-4872-4205-bfbb-09205de3c119",
+      "email": "quartzandexambritefounders@gmail.com",
+      "name": "Exambrite",
+      "password": "$2a$10$QS4I9Sig9H.arup/uZtm3OCO4RaaxpICBU.55mAn2blHKSAA4xpJO",
+      "role": "STUDENT",
+      "university": "OOU",
+      "isVerified": true,
+      "phone": "09023323399",
+      "matricNumber": "ees/24/26/0086",
+      "updatedAt": "2026-06-16T17:25:32.012Z",
+      "createdAt": "2026-06-16T16:59:32.610Z"
+    },
+    {
+      "id": "e2484b79-b6be-4bf7-8f4f-f8438af8f33f",
+      "email": "usmanjoseph2121@gmail.com",
+      "name": "Joseph",
+      "password": "$2a$10$wJ7JV04k/da6PbIixB33yecDVcCVBNHdP7eZ8f1OXMl2XWNF9VuYS",
+      "role": "STUDENT",
+      "university": "OOU",
+      "isVerified": true,
+      "phone": "09023323399",
+      "matricNumber": null,
+      "updatedAt": "2026-06-16T17:27:52.385Z",
+      "createdAt": "2026-06-16T17:27:52.353Z"
+    },
+    {
+      "id": "eb421625-8bba-461a-8a5d-0a6a1a826c90",
+      "email": "ade@gmail.com",
+      "name": "Ademuwagun",
+      "password": "$2a$10$pNanfFbKBP1KEqsKXb/8gu9o85ZmebqjDuWzFfzSUwAPyzzIdVqqa",
+      "role": "STUDENT",
+      "isVerified": true,
+      "phone": "08144065785",
+      "matricNumber": null,
+      "updatedAt": "2026-06-16T23:16:41.955Z",
+      "createdAt": "2026-06-16T22:38:59.432Z",
+      "isBanned": false
+    }
+  ],
+  "Event": [
+    {
+      "id": "tech-summit-oou",
+      "title": "OOU Campus Tech Summit 2026",
+      "description": "A full-day gathering for builders, designers, founders, and student operators learning how to ship useful products from campus.",
+      "bannerImage": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1400&q=80",
+      "date": "2026-07-04T10:00:00.000Z",
+      "location": "ICT Centre, Ago-Iwoye",
+      "organizerId": "admin-user-id",
+      "category": "Tech",
+      "isVotingEnabled": true,
+      "isVotingPaid": true,
+      "voteCost": 100,
+      "createdAt": "2026-06-15T18:10:30.672Z",
+      "updatedAt": "2026-06-17T09:44:43.277Z"
+    },
+    {
+      "id": "faculty-dinner",
+      "title": "Faculty of Arts Dinner and Awards",
+      "description": "A polished dinner night with live music, awards, red carpet photos, and faculty alumni guests.",
+      "bannerImage": "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1400&q=80",
+      "date": "2026-07-12T18:00:00.000Z",
+      "location": "Blue Roof Hall, Lagos",
+      "organizerId": "admin-user-id",
+      "category": "Dinner",
+      "isVotingEnabled": false,
+      "isVotingPaid": false,
+      "voteCost": 0,
+      "createdAt": "2026-06-15T18:10:30.672Z",
+      "updatedAt": "2026-06-15T18:10:30.672Z"
+    },
+    {
+      "id": "founders-workshop",
+      "title": "Student Founders Workshop",
+      "description": "A practical workshop on idea validation, pricing, payments, and launching your first campus business.",
+      "bannerImage": "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1400&q=80",
+      "date": "2026-07-18T11:30:00.000Z",
+      "location": "Innovation Hub, Ibadan",
+      "organizerId": "admin-user-id",
+      "category": "Workshop",
+      "isVotingEnabled": false,
+      "isVotingPaid": false,
+      "voteCost": 0,
+      "createdAt": "2026-06-16T12:20:00.000Z",
+      "updatedAt": "2026-06-16T12:20:00.000Z"
+    },
+    {
+      "id": "lasu-sports-fest",
+      "title": "LASU Inter-Department Sports Festival",
+      "description": "Football, basketball, athletics, table tennis, and faculty fan zones across a three-day sports festival.",
+      "bannerImage": "https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1400&q=80",
+      "date": "2026-08-02T08:00:00.000Z",
+      "location": "LASU Sports Complex",
+      "organizerId": "admin-user-id",
+      "category": "Sports",
+      "isVotingEnabled": false,
+      "isVotingPaid": false,
+      "voteCost": 0,
+      "createdAt": "2026-06-16T12:20:00.000Z",
+      "updatedAt": "2026-06-16T12:20:00.000Z"
+    },
+    {
+      "id": "worship-night",
+      "title": "Campus Worship Night",
+      "description": "A faith gathering with choirs, spoken word, short teachings, and donation support for outreach projects.",
+      "bannerImage": "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1400&q=80",
+      "date": "2026-08-09T17:00:00.000Z",
+      "location": "Amphitheatre, OAU",
+      "organizerId": "admin-user-id",
+      "category": "Religious",
+      "isVotingEnabled": false,
+      "isVotingPaid": false,
+      "voteCost": 0,
+      "createdAt": "2026-06-16T12:20:00.000Z",
+      "updatedAt": "2026-06-16T12:20:00.000Z"
+    },
+    {
+      "id": "hack-the-campus",
+      "title": "Hack The Campus 48-Hour Hackathon",
+      "description": "Teams build tools for hostel life, course registration, voting, payments, and student safety.",
+      "bannerImage": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1400&q=80",
+      "date": "2026-08-21T09:00:00.000Z",
+      "location": "FUTA Computer Lab",
+      "organizerId": "admin-user-id",
+      "category": "Hackathon",
+      "isVotingEnabled": false,
+      "isVotingPaid": false,
+      "voteCost": 0,
+      "createdAt": "2026-06-16T12:20:00.000Z",
+      "updatedAt": "2026-06-16T23:23:13.782Z",
+      "isSuspended": false
+    },
+    {
+      "id": "caa05b3c-c40c-42d1-bbb2-923c0c0d21eb",
+      "title": "orientation",
+      "description": "The orientation",
+      "bannerImage": "http://localhost:5000/uploads/cfd04bc8-2b86-4aa1-b467-646e84a60777.png",
+      "date": "2026-06-26T14:54:00.000Z",
+      "location": "Ibogun town hall",
+      "category": "Tech",
+      "organizerId": "f4ed0afc-ba4c-44ac-9434-93ad38e393a2",
+      "createdAt": "2026-06-16T14:56:25.660Z",
+      "updatedAt": "2026-06-17T12:39:53.072Z",
+      "isVotingEnabled": false,
+      "isVotingPaid": true,
+      "voteCost": 100
+    }
+  ],
+  "Ticket": [
+    {
+      "id": "tech-summit-oou-student",
+      "name": "Student",
+      "price": 2500,
+      "quantity": 900,
+      "sold": 613,
+      "eventId": "tech-summit-oou",
+      "updatedAt": "2026-06-15T18:18:12.248Z"
+    },
+    {
+      "id": "tech-summit-oou-vip",
+      "name": "VIP",
+      "price": 7500,
+      "quantity": 120,
+      "sold": 82,
+      "eventId": "tech-summit-oou"
+    },
+    {
+      "id": "faculty-dinner-regular",
+      "name": "Regular",
+      "price": 8000,
+      "quantity": 500,
+      "sold": 284,
+      "eventId": "faculty-dinner"
+    },
+    {
+      "id": "faculty-dinner-table",
+      "name": "Table",
+      "price": 65000,
+      "quantity": 30,
+      "sold": 18,
+      "eventId": "faculty-dinner"
+    },
+    {
+      "id": "founders-workshop-free-pass",
+      "name": "Free Pass",
+      "price": 0,
+      "quantity": 400,
+      "sold": 275,
+      "eventId": "founders-workshop"
+    },
+    {
+      "id": "lasu-sports-fest-access-band",
+      "name": "Access Band",
+      "price": 1000,
+      "quantity": 2000,
+      "sold": 914,
+      "eventId": "lasu-sports-fest",
+      "updatedAt": "2026-06-16T12:25:43.366Z"
+    },
+    {
+      "id": "worship-night-free-seat",
+      "name": "Free Seat",
+      "price": 0,
+      "quantity": 1500,
+      "sold": 960,
+      "eventId": "worship-night"
+    },
+    {
+      "id": "hack-the-campus-team-slot",
+      "name": "Team Slot",
+      "price": 3000,
+      "quantity": 180,
+      "sold": 129,
+      "eventId": "hack-the-campus"
+    },
+    {
+      "id": "605627d3-6774-487a-8c8d-65aa5a2e1411",
+      "name": "regular",
+      "price": 4000,
+      "quantity": 29,
+      "sold": 1,
+      "eventId": "caa05b3c-c40c-42d1-bbb2-923c0c0d21eb",
+      "createdAt": "2026-06-16T14:56:25.681Z",
+      "updatedAt": "2026-06-16T22:43:55.923Z"
+    },
+    {
+      "id": "b3448d29-91b1-4ed8-a85e-0998c40f9b7d",
+      "name": "VIP",
+      "price": 7000,
+      "quantity": 1,
+      "sold": 1,
+      "eventId": "caa05b3c-c40c-42d1-bbb2-923c0c0d21eb",
+      "createdAt": "2026-06-16T14:56:25.681Z",
+      "updatedAt": "2026-06-16T17:28:25.264Z"
+    },
+    {
+      "id": "e32a3883-4331-4281-8ef0-028e3c85e17d",
+      "name": "Table for 4",
+      "price": 10000,
+      "quantity": 1,
+      "sold": 1,
+      "eventId": "caa05b3c-c40c-42d1-bbb2-923c0c0d21eb",
+      "createdAt": "2026-06-16T14:56:25.681Z",
+      "updatedAt": "2026-06-16T17:36:44.379Z"
+    }
+  ],
+  "Order": [
+    {
+      "id": "ctze7v9vt5omqfjd0ch",
+      "userId": "admin-user-id",
+      "totalPrice": 2500,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-15T18:18:12.225Z",
+      "createdAt": "2026-06-15T18:17:43.169Z"
+    },
+    {
+      "id": "kigusskk0cmqfkhk1b",
+      "userId": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "totalPrice": 65000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-15T18:49:14.927Z",
+      "createdAt": "2026-06-15T18:49:14.927Z"
+    },
+    {
+      "id": "8zn3zpm12dpmqfucno3",
+      "userId": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "totalPrice": 8000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-15T23:25:22.516Z",
+      "createdAt": "2026-06-15T23:25:22.515Z"
+    },
+    {
+      "id": "tweuueyfkuamqglfwex",
+      "userId": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "totalPrice": 2500,
+      "status": "PENDING",
+      "updatedAt": "2026-06-16T12:03:43.449Z",
+      "createdAt": "2026-06-16T12:03:43.449Z"
+    },
+    {
+      "id": "tnjc77s7wvtmqglwppd",
+      "userId": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "totalPrice": 2500,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-16T12:19:31.850Z",
+      "createdAt": "2026-06-16T12:16:47.905Z"
+    },
+    {
+      "id": "go49mpwvw94mqgm5kmt",
+      "userId": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "totalPrice": 1000,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-16T12:23:52.867Z",
+      "createdAt": "2026-06-16T12:23:41.237Z"
+    },
+    {
+      "id": "6gmlhl5n6wdmqgm7y2q",
+      "userId": "bb2c2f1f-d7d2-42fe-b907-6260cdc62800",
+      "totalPrice": 1000,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-16T12:25:43.338Z",
+      "createdAt": "2026-06-16T12:25:31.971Z"
+    },
+    {
+      "id": "9ezrdzagrssmqgwxr0p",
+      "userId": "4b29b133-4872-4205-bfbb-09205de3c119",
+      "totalPrice": 7000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-16T17:25:32.041Z",
+      "createdAt": "2026-06-16T17:25:32.041Z"
+    },
+    {
+      "id": "uic2ad3g7o8mqgx0rbv",
+      "userId": "e2484b79-b6be-4bf7-8f4f-f8438af8f33f",
+      "totalPrice": 7000,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-16T17:28:25.243Z",
+      "createdAt": "2026-06-16T17:27:52.411Z"
+    },
+    {
+      "id": "jx616hug2zmqgxc2xf",
+      "userId": "f4ed0afc-ba4c-44ac-9434-93ad38e393a2",
+      "totalPrice": 10000,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-16T17:36:44.354Z",
+      "createdAt": "2026-06-16T17:36:40.659Z"
+    },
+    {
+      "id": "11ggdvjv4usmqh84uxq",
+      "userId": "eb421625-8bba-461a-8a5d-0a6a1a826c90",
+      "totalPrice": 4000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-16T22:38:59.486Z",
+      "createdAt": "2026-06-16T22:38:59.486Z"
+    },
+    {
+      "id": "sep936r8vmqh8a6bs",
+      "userId": "eb421625-8bba-461a-8a5d-0a6a1a826c90",
+      "totalPrice": 4000,
+      "status": "COMPLETED",
+      "updatedAt": "2026-06-16T22:43:55.882Z",
+      "createdAt": "2026-06-16T22:43:07.528Z"
+    }
+  ],
+  "OrderItem": [
+    {
+      "id": "o4u7s6h9rsmqfjd0dc",
+      "ticketId": "tech-summit-oou-student",
+      "quantity": 1,
+      "qrCode": "OTX-ddbd5e8c-4011-4fe7-b618-2caed9a79146",
+      "orderId": "ctze7v9vt5omqfjd0ch",
+      "createdAt": "2026-06-15T18:17:43.200Z",
+      "updatedAt": "2026-06-15T18:17:43.200Z"
+    },
+    {
+      "id": "gmu0xgdzdy5mqfkhk1x",
+      "ticketId": "faculty-dinner-table",
+      "quantity": 1,
+      "qrCode": "OTX-411ff9e8-d98f-4227-96a9-274a0b1811c1",
+      "orderId": "kigusskk0cmqfkhk1b",
+      "createdAt": "2026-06-15T18:49:14.949Z",
+      "updatedAt": "2026-06-15T18:49:14.949Z"
+    },
+    {
+      "id": "ugcmm4ytmwmqfucnp6",
+      "ticketId": "faculty-dinner-regular",
+      "quantity": 1,
+      "qrCode": "OTX-582c2bca-837f-491d-91c7-3d9cf42f831f",
+      "orderId": "8zn3zpm12dpmqfucno3",
+      "createdAt": "2026-06-15T23:25:22.554Z",
+      "updatedAt": "2026-06-15T23:25:22.554Z"
+    },
+    {
+      "id": "rka2n6o55blmqglfwfi",
+      "ticketId": "tech-summit-oou-student",
+      "quantity": 1,
+      "qrCode": "OTX-db730d5a-9480-48b0-920b-b147e7931200",
+      "orderId": "tweuueyfkuamqglfwex",
+      "createdAt": "2026-06-16T12:03:43.470Z",
+      "updatedAt": "2026-06-16T12:03:43.470Z"
+    },
+    {
+      "id": "f5usdmjl70dmqglwpq8",
+      "ticketId": "tech-summit-oou-student",
+      "quantity": 1,
+      "qrCode": "OTX-9e0c1056-82fd-413e-aa14-4d022c31b596",
+      "orderId": "tnjc77s7wvtmqglwppd",
+      "createdAt": "2026-06-16T12:16:47.936Z",
+      "updatedAt": "2026-06-16T12:16:47.936Z"
+    },
+    {
+      "id": "0k8p1194e4e7mqgm5kno",
+      "ticketId": "lasu-sports-fest-access-band",
+      "quantity": 1,
+      "qrCode": "OTX-c51b8ed0-9ccf-4a76-a483-8974dc5d6c14",
+      "orderId": "go49mpwvw94mqgm5kmt",
+      "createdAt": "2026-06-16T12:23:41.268Z",
+      "updatedAt": "2026-06-16T12:23:41.269Z"
+    },
+    {
+      "id": "v4n9sywkqjimqgm7y3j",
+      "ticketId": "lasu-sports-fest-access-band",
+      "quantity": 1,
+      "qrCode": "OTX-277faa90-0191-41ff-bc1e-93b84e995ea9",
+      "orderId": "6gmlhl5n6wdmqgm7y2q",
+      "createdAt": "2026-06-16T12:25:31.999Z",
+      "updatedAt": "2026-06-16T12:25:31.999Z"
+    },
+    {
+      "id": "kqwdglm2pyamqgwxr16",
+      "ticketId": "b3448d29-91b1-4ed8-a85e-0998c40f9b7d",
+      "quantity": 1,
+      "qrCode": "OTX-0aac28d3-ac0d-44d9-8972-ff0c180e9037",
+      "orderId": "9ezrdzagrssmqgwxr0p",
+      "createdAt": "2026-06-16T17:25:32.058Z",
+      "updatedAt": "2026-06-16T17:25:32.058Z"
+    },
+    {
+      "id": "dhna1t8uj67mqgx0rcd",
+      "ticketId": "b3448d29-91b1-4ed8-a85e-0998c40f9b7d",
+      "quantity": 1,
+      "qrCode": "OTX-f4ed6065-0aba-4e2c-8485-592b19bc9ee7",
+      "orderId": "uic2ad3g7o8mqgx0rbv",
+      "createdAt": "2026-06-16T17:27:52.429Z",
+      "updatedAt": "2026-06-16T17:44:15.415Z",
+      "isUsed": true
+    },
+    {
+      "id": "1bahyxxpb4vmqgxc2xw",
+      "ticketId": "e32a3883-4331-4281-8ef0-028e3c85e17d",
+      "quantity": 1,
+      "qrCode": "OTX-2f14e000-6852-42a0-9c6d-9074169b8844",
+      "orderId": "jx616hug2zmqgxc2xf",
+      "createdAt": "2026-06-16T17:36:40.676Z",
+      "updatedAt": "2026-06-16T17:44:45.758Z",
+      "isUsed": true
+    },
+    {
+      "id": "q9wp5vonv19mqh84uyf",
+      "ticketId": "605627d3-6774-487a-8c8d-65aa5a2e1411",
+      "quantity": 1,
+      "qrCode": "OTX-7f2c1130-3859-4ff9-b9c3-f5a37a3f06e5",
+      "orderId": "11ggdvjv4usmqh84uxq",
+      "createdAt": "2026-06-16T22:38:59.511Z",
+      "updatedAt": "2026-06-16T22:38:59.511Z"
+    },
+    {
+      "id": "v4q9pgdwq3emqh8a6cm",
+      "ticketId": "605627d3-6774-487a-8c8d-65aa5a2e1411",
+      "quantity": 1,
+      "qrCode": "OTX-5e5a545c-98ef-465d-af92-0076bf621b08",
+      "orderId": "sep936r8vmqh8a6bs",
+      "createdAt": "2026-06-16T22:43:07.558Z",
+      "updatedAt": "2026-06-16T22:43:07.558Z"
+    }
+  ],
+  "Payment": [
+    {
+      "id": "rs9t62727mqfjd0e7",
+      "orderId": "ctze7v9vt5omqfjd0ch",
+      "reference": "REF-1781547462966",
+      "amount": 2500,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-15T18:18:12.202Z",
+      "createdAt": "2026-06-15T18:17:43.231Z"
+    },
+    {
+      "id": "uos8xyjmckmqfkhk2i",
+      "orderId": "kigusskk0cmqfkhk1b",
+      "reference": "REF-1781549354349",
+      "amount": 65000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-15T18:49:14.970Z",
+      "createdAt": "2026-06-15T18:49:14.970Z"
+    },
+    {
+      "id": "299ml155t7amqfucnq5",
+      "orderId": "8zn3zpm12dpmqfucno3",
+      "reference": "REF-1781565922061",
+      "amount": 8000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-15T23:25:22.589Z",
+      "createdAt": "2026-06-15T23:25:22.589Z"
+    },
+    {
+      "id": "ubb3cnowcahmqglfwg9",
+      "orderId": "tweuueyfkuamqglfwex",
+      "reference": "REF-1781611423151",
+      "amount": 2500,
+      "status": "PENDING",
+      "updatedAt": "2026-06-16T12:03:43.497Z",
+      "createdAt": "2026-06-16T12:03:43.497Z"
+    },
+    {
+      "id": "zre1vce28qjmqglwpr0",
+      "orderId": "tnjc77s7wvtmqglwppd",
+      "reference": "REF-1781612207179",
+      "amount": 2500,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-16T12:19:31.744Z",
+      "createdAt": "2026-06-16T12:16:47.964Z"
+    },
+    {
+      "id": "fgx5hl5yauvmqgm5kok",
+      "orderId": "go49mpwvw94mqgm5kmt",
+      "reference": "REF-SPORTS-TEST",
+      "amount": 1000,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-16T12:23:52.834Z",
+      "createdAt": "2026-06-16T12:23:41.300Z"
+    },
+    {
+      "id": "bzpps180afmqgm7y4d",
+      "orderId": "6gmlhl5n6wdmqgm7y2q",
+      "reference": "REF-1781612731683",
+      "amount": 1000,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-16T12:25:43.257Z",
+      "createdAt": "2026-06-16T12:25:32.029Z"
+    },
+    {
+      "id": "bltefr5xdzdmqgwxr1m",
+      "orderId": "9ezrdzagrssmqgwxr0p",
+      "reference": "REF-1781630731952",
+      "amount": 7000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-16T17:25:32.074Z",
+      "createdAt": "2026-06-16T17:25:32.074Z"
+    },
+    {
+      "id": "pafn1rok7mqgx0rcv",
+      "orderId": "uic2ad3g7o8mqgx0rbv",
+      "reference": "REF-1781630872156",
+      "amount": 7000,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-16T17:28:25.215Z",
+      "createdAt": "2026-06-16T17:27:52.447Z"
+    },
+    {
+      "id": "kt5rvxl2crqmqgxc2yc",
+      "orderId": "jx616hug2zmqgxc2xf",
+      "reference": "REF-1781631400553",
+      "amount": 10000,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-16T17:36:44.321Z",
+      "createdAt": "2026-06-16T17:36:40.692Z"
+    },
+    {
+      "id": "km14hgjfndmqh84uz3",
+      "orderId": "11ggdvjv4usmqh84uxq",
+      "reference": "REF-1781649538121",
+      "amount": 4000,
+      "status": "PENDING",
+      "updatedAt": "2026-06-16T22:38:59.535Z",
+      "createdAt": "2026-06-16T22:38:59.535Z"
+    },
+    {
+      "id": "k1pguz8wolnmqh8a6dl",
+      "orderId": "sep936r8vmqh8a6bs",
+      "reference": "REF-1781649787396",
+      "amount": 4000,
+      "status": "SUCCESSFUL",
+      "updatedAt": "2026-06-16T22:43:55.841Z",
+      "createdAt": "2026-06-16T22:43:07.593Z"
+    }
+  ],
+  "VoteCategory": [
+    {
+      "id": "cat-1",
+      "name": "Miss Faculty of Science",
+      "eventId": "tech-summit-oou"
+    },
+    {
+      "id": "3c1887e3-d013-432d-b891-e62692c7c1c5",
+      "name": "techie of the year",
+      "eventId": "caa05b3c-c40c-42d1-bbb2-923c0c0d21eb",
+      "createdAt": "2026-06-17T10:01:08.349Z",
+      "updatedAt": "2026-06-17T10:01:08.349Z"
+    },
+    {
+      "id": "e1d1e3e8-19b0-400e-9348-2a304670ce6d",
+      "name": "Outstanding Hacker 692",
+      "eventId": "tech-summit-oou",
+      "createdAt": "2026-06-17T10:08:55.773Z",
+      "updatedAt": "2026-06-17T10:08:55.774Z"
+    }
+  ],
+  "Contestant": [
+    {
+      "id": "cont-1",
+      "name": "Teniola Adeyemi",
+      "image": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=500&q=80",
+      "details": "{\"department\":\"Microbiology\"}",
+      "categoryId": "cat-1"
+    },
+    {
+      "id": "cont-2",
+      "name": "Ruth Eze",
+      "image": "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=500&q=80",
+      "details": "{\"department\":\"Computer Science\"}",
+      "categoryId": "cat-1"
+    },
+    {
+      "id": "f19ff3aa-8bb6-4487-91d8-ce66df68927f",
+      "name": "Ademuwagun Mayokun",
+      "image": "/images/party.png",
+      "details": "{\"nickname\":\"Mayor\",\"faculty\":\"Engineering\",\"department\":\"computer engineering\",\"level\":\"200L\",\"bio\":\"I am here to serve and put my best in this \",\"instagram\":\"muwgunprecious\"}",
+      "categoryId": "3c1887e3-d013-432d-b891-e62692c7c1c5",
+      "createdAt": "2026-06-17T10:01:08.393Z",
+      "updatedAt": "2026-06-17T10:01:08.393Z"
+    },
+    {
+      "id": "f44da64c-6f18-4c31-8065-fe88bd5bc439",
+      "name": "Teniola Adeyemi",
+      "image": "/images/party.png",
+      "details": "{\"nickname\":\"Teni\",\"bio\":\"Let's win this hackathon!\"}",
+      "categoryId": "e1d1e3e8-19b0-400e-9348-2a304670ce6d",
+      "createdAt": "2026-06-17T10:08:55.852Z",
+      "updatedAt": "2026-06-17T10:08:55.852Z"
+    }
+  ],
+  "Vote": [
+    {
+      "id": "n6j9jlgtsarmqhvw5is",
+      "email": "voter-n09xlh@test.com",
+      "name": "Test Voter",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T09:44:04.085Z",
+      "updatedAt": "2026-06-17T09:44:04.087Z"
+    },
+    {
+      "id": "09sj6l6j3yysmqhvw5l0",
+      "email": "voter-n09xlh@test.com",
+      "name": "Test Voter Duplicate",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T09:44:04.164Z",
+      "updatedAt": "2026-06-17T09:44:04.165Z"
+    },
+    {
+      "id": "3exqncybrvxmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "0gv72ppw12bsmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "mfg9dmi9srqmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "qmifiddudmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "d6hua77dblrmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "6d4m30m7oavmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "19kap3kr3iwjmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "nqbqwi1h4qmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "7346tqrbyfcmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "6trh670baepmqhvw5sf",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:04.431Z",
+      "updatedAt": "2026-06-17T09:44:04.432Z"
+    },
+    {
+      "id": "8i9fx5tetfimqhvwzpy",
+      "email": "free-voter-2s8ko@test.com",
+      "name": "Free Voter",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T09:44:43.222Z",
+      "updatedAt": "2026-06-17T09:44:43.223Z"
+    },
+    {
+      "id": "4wch7g4ks8pmqhvwzsj",
+      "email": "paid-voter-8o8es4@test.com",
+      "name": "Paid Voter",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T09:44:43.315Z",
+      "updatedAt": "2026-06-17T09:44:43.317Z"
+    },
+    {
+      "id": "mvx6wazimjjmqhvwztn",
+      "email": "paid-voter-8o8es4@test.com",
+      "name": "Paid Voter Duplicate",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T09:44:43.355Z",
+      "updatedAt": "2026-06-17T09:44:43.357Z"
+    },
+    {
+      "id": "98r1qrgep2lmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "9jkr52s04zjmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "in9rbkmfg2cmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "wxgf90nf85mqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "u8zqr8w5vjgmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "5n5jdedqsptmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "c7mzd4mgu6bmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "zef9d5z9sumqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "tsb049qdipqmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "1jvz4cvd0fsmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "kbscqbo9gtcmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "or9x8j2lqamqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "j1ltwgecbsmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "r2tnbjypjwomqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "yz0iaauf72mqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "ys8k6yvo8pemqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "iw9p9ys08zmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "yeza5n7rz3fmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "7s8phpmqpg8mqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "oqy9ewdbo7mqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "n57v6pa8tkamqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "qv69himq96mmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "0kdq7st8gplmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "tr76hfq2micmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "dmzz91dqimdmqhvwzuq",
+      "email": "tweak@swyft.com",
+      "name": "Organizer Tweak",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": true,
+      "createdAt": "2026-06-17T09:44:43.394Z",
+      "updatedAt": "2026-06-17T09:44:43.396Z"
+    },
+    {
+      "id": "ig4wzly8axjmqi0ijlu",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "3c1887e3-d013-432d-b891-e62692c7c1c5",
+      "contestantId": "f19ff3aa-8bb6-4487-91d8-ce66df68927f",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T11:53:27.234Z",
+      "updatedAt": "2026-06-17T11:53:27.236Z"
+    },
+    {
+      "id": "pciic850nxmqi1c7kz",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.332Z",
+      "updatedAt": "2026-06-17T12:16:31.334Z"
+    },
+    {
+      "id": "ootxckenwemqi1c7mx",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.401Z",
+      "updatedAt": "2026-06-17T12:16:31.415Z"
+    },
+    {
+      "id": "w9qu5lhbffbmqi1c7pd",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.489Z",
+      "updatedAt": "2026-06-17T12:16:31.491Z"
+    },
+    {
+      "id": "1s4zeokyoqemqi1c7qj",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.531Z",
+      "updatedAt": "2026-06-17T12:16:31.533Z"
+    },
+    {
+      "id": "is4olprwlctmqi1c7rm",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.570Z",
+      "updatedAt": "2026-06-17T12:16:31.572Z"
+    },
+    {
+      "id": "jyflyiagrulmqi1c7sv",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.615Z",
+      "updatedAt": "2026-06-17T12:16:31.616Z"
+    },
+    {
+      "id": "epysqqrh6ewmqi1c7tt",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.649Z",
+      "updatedAt": "2026-06-17T12:16:31.650Z"
+    },
+    {
+      "id": "an1k1i8leokmqi1c7ui",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.674Z",
+      "updatedAt": "2026-06-17T12:16:31.676Z"
+    },
+    {
+      "id": "3y8wdjez6kcmqi1c7v7",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.699Z",
+      "updatedAt": "2026-06-17T12:16:31.700Z"
+    },
+    {
+      "id": "c75oqaqhtmmqi1c7w0",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.728Z",
+      "updatedAt": "2026-06-17T12:16:31.729Z"
+    },
+    {
+      "id": "0lv2f3kwo83imqi1c7wp",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.753Z",
+      "updatedAt": "2026-06-17T12:16:31.754Z"
+    },
+    {
+      "id": "6v8kve4wccmqi1c7xi",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.782Z",
+      "updatedAt": "2026-06-17T12:16:31.783Z"
+    },
+    {
+      "id": "m9o1yd6vzemqi1c7y5",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.805Z",
+      "updatedAt": "2026-06-17T12:16:31.806Z"
+    },
+    {
+      "id": "7l56s81kbaymqi1c7z6",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.842Z",
+      "updatedAt": "2026-06-17T12:16:31.846Z"
+    },
+    {
+      "id": "5zbi1f6gw1pmqi1c7zz",
+      "email": "ademuwagun@gmail.com",
+      "name": "Ademuwagun",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T12:16:31.871Z",
+      "updatedAt": "2026-06-17T12:16:31.872Z"
+    },
+    {
+      "id": "soxmax93xagmqi71zz1",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.605Z",
+      "updatedAt": "2026-06-17T14:56:32.606Z"
+    },
+    {
+      "id": "4bw0clrm3w5mqi72005",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.645Z",
+      "updatedAt": "2026-06-17T14:56:32.646Z"
+    },
+    {
+      "id": "58uuun7lexmqi7200y",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.675Z",
+      "updatedAt": "2026-06-17T14:56:32.676Z"
+    },
+    {
+      "id": "lq76w0ny9yqmqi7201x",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.709Z",
+      "updatedAt": "2026-06-17T14:56:32.711Z"
+    },
+    {
+      "id": "cakqb2fl28imqi7202t",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.741Z",
+      "updatedAt": "2026-06-17T14:56:32.742Z"
+    },
+    {
+      "id": "ck007u0zx3mqi7203m",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.770Z",
+      "updatedAt": "2026-06-17T14:56:32.771Z"
+    },
+    {
+      "id": "p1hsoq9w2amqi7204k",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.804Z",
+      "updatedAt": "2026-06-17T14:56:32.806Z"
+    },
+    {
+      "id": "5qloy6rhl96mqi7205f",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.835Z",
+      "updatedAt": "2026-06-17T14:56:32.836Z"
+    },
+    {
+      "id": "2ghmgg02vt6mqi72068",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.864Z",
+      "updatedAt": "2026-06-17T14:56:32.867Z"
+    },
+    {
+      "id": "3fpu9nleycumqi7206z",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.891Z",
+      "updatedAt": "2026-06-17T14:56:32.892Z"
+    },
+    {
+      "id": "7dx2jrdklsmqi7207w",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.924Z",
+      "updatedAt": "2026-06-17T14:56:32.927Z"
+    },
+    {
+      "id": "5fvdionh7fymqi7208r",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.955Z",
+      "updatedAt": "2026-06-17T14:56:32.956Z"
+    },
+    {
+      "id": "y73qpr85vbmqi7209i",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:32.982Z",
+      "updatedAt": "2026-06-17T14:56:32.984Z"
+    },
+    {
+      "id": "wuvbhc904hmqi720ab",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:33.011Z",
+      "updatedAt": "2026-06-17T14:56:33.012Z"
+    },
+    {
+      "id": "3qbdbzxrvkymqi720az",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:33.035Z",
+      "updatedAt": "2026-06-17T14:56:33.037Z"
+    },
+    {
+      "id": "rioqcpvxjhemqi720bt",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:33.065Z",
+      "updatedAt": "2026-06-17T14:56:33.066Z"
+    },
+    {
+      "id": "susmg9q6n8mqi720cl",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:33.093Z",
+      "updatedAt": "2026-06-17T14:56:33.096Z"
+    },
+    {
+      "id": "hylctygpjvmqi720df",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-1",
+      "isTweaked": false,
+      "createdAt": "2026-06-17T14:56:33.123Z",
+      "updatedAt": "2026-06-17T14:56:33.124Z"
+    },
+    {
+      "id": "14o6lhew1phmqjx9dov",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-2",
+      "isTweaked": false,
+      "createdAt": "2026-06-18T19:57:53.167Z",
+      "updatedAt": "2026-06-18T19:57:53.168Z"
+    },
+    {
+      "id": "knf6uyu788hmqjx9dpp",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-2",
+      "isTweaked": false,
+      "createdAt": "2026-06-18T19:57:53.197Z",
+      "updatedAt": "2026-06-18T19:57:53.199Z"
+    },
+    {
+      "id": "7wqycoykqtimqjx9dqj",
+      "email": "ademuwagunremi60@gmail.com",
+      "name": "muwagun precious",
+      "categoryId": "cat-1",
+      "contestantId": "cont-2",
+      "isTweaked": false,
+      "createdAt": "2026-06-18T19:57:53.227Z",
+      "updatedAt": "2026-06-18T19:57:53.228Z"
+    }
+  ],
+  "Payout": [
+    {
+      "id": "payout-1",
+      "eventId": "tech-summit-oou",
+      "eventTitle": "OOU Campus Tech Summit 2026",
+      "organizerId": "admin-user-id",
+      "organizerName": "System Administrator",
+      "amount": 250000,
+      "status": "COMPLETED",
+      "createdAt": "2026-06-15T00:00:00.000Z",
+      "updatedAt": "2026-06-16T23:23:37.272Z"
+    },
+    {
+      "id": "payout-2",
+      "eventId": "faculty-dinner",
+      "eventTitle": "Faculty of Arts Dinner and Awards",
+      "organizerId": "admin-user-id",
+      "organizerName": "System Administrator",
+      "amount": 480000,
+      "status": "COMPLETED",
+      "createdAt": "2026-06-12T00:00:00.000Z",
+      "updatedAt": "2026-06-13T00:00:00.000Z"
+    },
+    {
+      "id": "payout-3",
+      "eventId": "caa05b3c-c40c-42d1-bbb2-923c0c0d21eb",
+      "eventTitle": "orientation",
+      "organizerId": "f4ed0afc-ba4c-44ac-9434-93ad38e393a2",
+      "organizerName": "Emmanuel Agida",
+      "amount": 14000,
+      "status": "COMPLETED",
+      "createdAt": "2026-06-16T12:00:00.000Z",
+      "updatedAt": "2026-06-16T23:16:10.422Z"
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ORGANIZER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  phone         String?
+  matricNumber  String?   @unique
+  role          Role      @default(STUDENT)
+  university    String?   // Student's university/campus
+  isVerified    Boolean   @default(false)
+  facultyId     String?
+  faculty       Faculty?  @relation(fields: [facultyId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  events        Event[]   @relation("OrganizerEvents")
+  orders        Order[]
+  votes         Vote[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Faculty {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  departments Department[]
+  users       User[]
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String
+  facultyId String
+  faculty   Faculty  @relation(fields: [facultyId], references: [id])
+  users     User[]
+}
+
+model Event {
+  id            String      @id @default(uuid())
+  title         String
+  description   String
+  bannerImage   String
+  flyerImage    String?
+  date          DateTime
+  location      String
+  organizerId   String
+  organizer     User        @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  category      String      // Faculty, Party, Academic, Award, etc.
+  tickets       Ticket[]
+  voteCategories VoteCategory[]
+  
+  // Voting Settings
+  isVotingEnabled    Boolean   @default(false)
+  isVotingPaid       Boolean   @default(false)
+  voteCost           Float     @default(0)
+  showLiveRankings   Boolean   @default(true)
+  allowMultipleVotes Boolean   @default(true)
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Ticket {
+  id          String   @id @default(uuid())
+  name        String   // Regular, VIP, etc.
+  price       Float
+  quantity    Int
+  sold        Int      @default(0)
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  totalPrice  Float
+  status      OrderStatus @default(PENDING)
+  items       OrderItem[]
+  payment     Payment?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id])
+  ticketId  String
+  ticket    Ticket @relation(fields: [ticketId], references: [id])
+  quantity  Int
+  qrCode    String? @unique
+  isUsed    Boolean @default(false)
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id])
+  reference     String        @unique
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  paymentMethod String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model VoteCategory {
+  id          String       @id @default(uuid())
+  name        String
+  eventId     String
+  event       Event        @relation(fields: [eventId], references: [id])
+  contestants Contestant[]
+  votes       Vote[]
+}
+
+model Contestant {
+  id          String       @id @default(uuid())
+  name        String
+  image       String
+  details     String?
+  categoryId  String
+  category    VoteCategory @relation(fields: [categoryId], references: [id])
+  votes       Vote[]
+}
+
+model Vote {
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  categoryId    String
+  category      VoteCategory @relation(fields: [categoryId], references: [id])
+  contestantId  String
+  contestant    Contestant   @relation(fields: [contestantId], references: [id])
+  createdAt     DateTime     @default(now())
+
+  @@unique([userId, categoryId]) // One vote per category per user
+}
