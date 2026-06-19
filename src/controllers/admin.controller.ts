@@ -319,12 +319,15 @@ export const getUserAuditTrail = async (req: AuthRequest, res: Response) => {
       .eq('isTweaked', false);
 
     if (votes) {
-      for (const vote of votes) {
+      for (const vote of votes as any[]) {
+        const contestant = Array.isArray(vote.contestant) ? vote.contestant[0] : vote.contestant;
+        const category = Array.isArray(vote.category) ? vote.category[0] : vote.category;
+        const event = category ? (Array.isArray(category.event) ? category.event[0] : category.event) : null;
         activities.push({
           id: vote.id,
           type: 'VOTE_CAST',
-          title: `Cast Vote for ${vote.contestant?.name || 'Unknown'}`,
-          description: `Event: ${vote.category?.event?.title || 'Unknown'} | Category: ${vote.category?.name || 'Unknown'}`,
+          title: `Cast Vote for ${contestant?.name || 'Unknown'}`,
+          description: `Event: ${event?.title || 'Unknown'} | Category: ${category?.name || 'Unknown'}`,
           date: vote.createdAt
         });
       }
@@ -340,17 +343,20 @@ export const getUserAuditTrail = async (req: AuthRequest, res: Response) => {
 
       if (tweaks) {
         const groupedTweaks: Record<string, any> = {};
-        for (const tweak of tweaks) {
-          const minString = new Date(tweak.createdAt).toISOString().substring(0, 16); // Group by YYYY-MM-DDTHH:mm
-          const key = `${tweak.contestant?.name}-${minString}`;
+        for (const tweak of tweaks as any[]) {
+          const contestant = Array.isArray(tweak.contestant) ? tweak.contestant[0] : tweak.contestant;
+          const category = Array.isArray(tweak.category) ? tweak.category[0] : tweak.category;
+          const event = category ? (Array.isArray(category.event) ? category.event[0] : category.event) : null;
+          const minString = new Date(tweak.createdAt).toISOString().substring(0, 16);
+          const key = `${contestant?.name}-${minString}`;
           if (!groupedTweaks[key]) {
             groupedTweaks[key] = {
               id: tweak.id,
               type: 'VOTE_ALTERED',
               count: 0,
-              contestantName: tweak.contestant?.name || 'Unknown',
-              eventName: tweak.category?.event?.title || 'Unknown',
-              categoryName: tweak.category?.name || 'Unknown',
+              contestantName: contestant?.name || 'Unknown',
+              eventName: event?.title || 'Unknown',
+              categoryName: category?.name || 'Unknown',
               date: tweak.createdAt
             };
           }
