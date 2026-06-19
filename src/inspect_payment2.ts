@@ -11,7 +11,7 @@ async function run() {
   if (pErr) {
     console.error("Error fetching payments:", pErr.message);
   } else {
-    payments?.forEach(p => {
+    payments?.forEach((p: any) => {
       console.log(`Reference: ${p.reference}`);
       console.log(`  Amount: ₦${p.amount}`);
       console.log(`  Status: ${p.status}`);
