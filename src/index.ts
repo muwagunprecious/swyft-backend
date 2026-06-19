@@ -47,4 +47,4 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
 }
 
 export { prisma };
-export default app;
+module.exports = app;
