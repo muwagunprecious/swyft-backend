@@ -71,30 +71,14 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
     // Upload image locally if base64 provided
     let finalBannerImage = '/images/party.png';
-    if (bannerImage && bannerImage.startsWith('data:image/')) {
-      try {
-        const matches = bannerImage.match(/^data:(.+);base64,(.+)$/);
-        if (matches) {
-          const mimeType = matches[1];
-          const base64Data = matches[2];
-          const ext = mimeType.split('/')[1] || 'jpg';
-          const fileName = `${crypto.randomUUID()}.${ext}`;
-          
-          const fs = await import('fs');
-          const path = await import('path');
-          const uploadPath = path.join(process.cwd(), 'public', 'uploads', fileName);
-          
-          fs.writeFileSync(uploadPath, base64Data, 'base64');
-          finalBannerImage = `http://localhost:5000/uploads/${fileName}`;
-        }
-      } catch (imgErr: any) {
-        console.error('Local image processing error:', imgErr.message);
-        // Keep fallback placeholder
+      if (bannerImage && bannerImage.startsWith('data:image/')) {
+        // Safe and cloud-native: Store the base64 string directly in the database.
+        // This avoids Vercel EROFS read-only crashes, requires no external buckets, and solves CORS locally.
+        finalBannerImage = bannerImage;
+      } else if (bannerImage && !bannerImage.startsWith('blob:')) {
+        // Accept plain URLs (e.g. https://...)
+        finalBannerImage = bannerImage;
       }
-    } else if (bannerImage && !bannerImage.startsWith('blob:')) {
-      // Accept plain URLs (e.g. https://...)
-      finalBannerImage = bannerImage;
-    }
 
     // 1. Create Event (no updatedAt — Supabase handles it automatically)
     const eventId = crypto.randomUUID();

@@ -361,28 +361,12 @@ export const addContestant = async (req: AuthRequest, res: Response) => {
 
     // Process image base64 if provided
     let finalImage = '/images/party.png'; // fallback
-    if (image && image.startsWith('data:image/')) {
-      try {
-        const matches = image.match(/^data:(.+);base64,(.+)$/);
-        if (matches) {
-          const mimeType = matches[1];
-          const base64Data = matches[2];
-          const ext = mimeType.split('/')[1] || 'jpg';
-          const fileName = `contestant-${crypto.randomUUID()}.${ext}`;
-          
-          const fs = await import('fs');
-          const path = await import('path');
-          const uploadPath = path.join(process.cwd(), 'public', 'uploads', fileName);
-          
-          fs.writeFileSync(uploadPath, base64Data, 'base64');
-          finalImage = `http://localhost:5000/uploads/${fileName}`;
-        }
-      } catch (imgErr: any) {
-        console.error('Local image processing error:', imgErr.message);
+      if (image && image.startsWith('data:image/')) {
+        // Store base64 string directly in db to bypass Vercel EROFS read-only crashes
+        finalImage = image;
+      } else if (image && !image.startsWith('blob:')) {
+        finalImage = image;
       }
-    } else if (image && !image.startsWith('blob:')) {
-      finalImage = image;
-    }
 
     // Build details JSON string
     const detailsObj = {
