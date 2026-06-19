@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { sendTicketEmail } from '../services/email.service';
 import bcrypt from 'bcryptjs';
 
@@ -50,7 +50,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         userId = existingUser.id;
       } else {
         // Create guest user
-        const newUserId = uuidv4();
+        const newUserId = crypto.randomUUID();
         const randomPassword = await bcrypt.hash(newUserId, 10);
         
         const { error: createError } = await supabase.from('User').insert({
@@ -121,7 +121,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       orderItemsData.push({
         ticketId: item.ticketId,
         quantity: item.quantity,
-        qrCode: `OTX-${uuidv4()}`
+        qrCode: `OTX-${crypto.randomUUID()}`
       });
     }
 
