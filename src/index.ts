@@ -40,8 +40,11 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 OTIX Backend running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 OTIX Backend running on http://localhost:${PORT}`);
+  });
+}
 
 export { prisma };
+export default app;
