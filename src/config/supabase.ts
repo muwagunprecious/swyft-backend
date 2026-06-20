@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
+import fetch from 'cross-fetch';
+
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
@@ -13,5 +15,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl || 'http://localhost', supabaseAnonKey || 'dummy', {
   auth: {
     persistSession: false,
+  },
+  global: {
+    fetch: fetch,
   },
 });
