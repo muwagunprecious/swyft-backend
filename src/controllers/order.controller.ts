@@ -130,6 +130,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     let orderError: any = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const result: any = await supabase.from('Order').insert({ 
+        id: crypto.randomUUID(),
         userId, 
         totalPrice, 
         status: 'PENDING',
@@ -145,7 +146,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     }
 
     // 2. Create Order Items — retry up to 2x
-    const finalOrderItems = orderItemsData.map((item: any) => ({ ...item, orderId: order.id }));
+    const finalOrderItems = orderItemsData.map((item: any) => ({ ...item, id: crypto.randomUUID(), orderId: order.id }));
     let itemsError: any = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const result: any = await supabase.from('OrderItem').insert(finalOrderItems);
@@ -163,6 +164,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     let paymentError: any = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const result: any = await supabase.from('Payment').insert({
+        id: crypto.randomUUID(),
         orderId: order.id,
         reference: reference || `REF-${Date.now()}`,
         amount: totalPrice,
