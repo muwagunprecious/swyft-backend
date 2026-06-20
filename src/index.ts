@@ -35,8 +35,29 @@ app.use('/api/organizer', organizerRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health Check
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'OK', message: 'OTIX API is running' });
+app.get('/health', async (req: Request, res: Response) => {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  const jwtSecret = process.env.JWT_SECRET;
+
+  const config = {
+    supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : '❌ MISSING',
+    supabaseKey: supabaseKey ? '✅ SET' : '❌ MISSING',
+    jwtSecret: jwtSecret ? '✅ SET' : '❌ MISSING',
+    nodeEnv: process.env.NODE_ENV || 'not set',
+  };
+
+  // Try a quick DB ping
+  let dbStatus = 'unknown';
+  try {
+    const { supabase } = await import('./config/supabase');
+    const { error } = await supabase.from('User').select('id').limit(1);
+    dbStatus = error ? `❌ ${error.message}` : '✅ Connected';
+  } catch (e: any) {
+    dbStatus = `❌ ${e.message}`;
+  }
+
+  res.status(200).json({ status: 'OK', config, dbStatus });
 });
 
 // Root Route

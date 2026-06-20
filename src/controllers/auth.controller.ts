@@ -8,15 +8,25 @@ export const register = async (req: Request, res: Response) => {
     const { email, password, name, role, university } = req.body;
     let { matricNumber } = req.body;
 
-    // Normalize empty strings or whitespace optional matricNumber to null to avoid unique constraint violations in DB
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: 'Email, password and name are required' });
+    }
+
+    // Normalize empty strings or whitespace optional matricNumber to null
     matricNumber = (matricNumber && matricNumber.trim() !== '') ? matricNumber.trim() : null;
 
     // Check if user exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: lookupError } = await supabase
       .from('User')
       .select('id')
       .eq('email', email)
       .single();
+
+    // PGRST116 = no rows found — that's fine, means user doesn't exist
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      console.error('Supabase lookup error:', JSON.stringify(lookupError));
+      return res.status(500).json({ message: 'Database error during lookup', error: lookupError.message, code: lookupError.code });
+    }
 
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email' });
@@ -24,7 +34,6 @@ export const register = async (req: Request, res: Response) => {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
-
     const userId = globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2) + Date.now().toString(36);
 
     // Create user (auto-verified — email verification disabled)
@@ -44,14 +53,17 @@ export const register = async (req: Request, res: Response) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase insert error:', JSON.stringify(error));
+      return res.status(500).json({ message: 'Failed to create account', error: error.message, code: error.code, details: error.details, hint: error.hint });
+    }
 
     res.status(201).json({ 
       message: 'Account created successfully! You can now log in.', 
       userId: user.id 
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    console.error('Register error:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
