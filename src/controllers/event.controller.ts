@@ -93,6 +93,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
         location,
         category,
         organizerId,
+        updatedAt: new Date(),
       })
       .select()
       .single();
