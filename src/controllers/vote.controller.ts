@@ -83,7 +83,7 @@ export const getResults = async (req: Request, res: Response) => {
 
     const { data: results, error } = await supabase
       .from('VoteCategory')
-      .select('*, contestants(*), votes(*)')
+      .select('*, contestants:Contestant(*), votes:Vote(*)')
       .eq('eventId', eventId);
 
     if (error) throw error;
