@@ -42,9 +42,14 @@ model User {
   department    Department? @relation(fields: [departmentId], references: [id])
   events        Event[]   @relation("OrganizerEvents")
   orders        Order[]
-  votes         Vote[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Payout Settings
+  bankName         String?
+  accountNumber    String?
+  bankCode         String?
+  subaccountCode   String?
 }
 
 model Faculty {
@@ -154,13 +159,12 @@ model Contestant {
 
 model Vote {
   id            String       @id @default(uuid())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id])
+  email         String
+  name          String
+  isTweaked     Boolean      @default(false)
   categoryId    String
   category      VoteCategory @relation(fields: [categoryId], references: [id])
   contestantId  String
   contestant    Contestant   @relation(fields: [contestantId], references: [id])
   createdAt     DateTime     @default(now())
-
-  @@unique([userId, categoryId]) // One vote per category per user
 }
