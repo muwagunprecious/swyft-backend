@@ -153,22 +153,96 @@ export const updateProfile = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const { university } = req.body;
+    const { name, phone, university } = req.body;
 
-    if (!university || university.trim() === '') {
-      return res.status(400).json({ message: 'University is required' });
-    }
+    const updateData: any = { updatedAt: new Date() };
+    if (name && name.trim()) updateData.name = name.trim();
+    if (phone !== undefined) updateData.phone = phone.trim() || null;
+    if (university !== undefined) updateData.university = university.trim() || null;
 
     const { data: updatedUser, error } = await supabase
       .from('User')
-      .update({ university: university.trim(), updatedAt: new Date() })
+      .update(updateData)
       .eq('id', userId)
-      .select('id, email, name, role, university')
+      .select('id, email, name, role, university, phone')
       .single();
 
     if (error) throw error;
 
     res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
+  } catch (error: any) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters' });
+    }
+
+    // Fetch current user
+    const { data: user, error: fetchErr } = await supabase
+      .from('User')
+      .select('password')
+      .eq('id', userId)
+      .single();
+
+    if (fetchErr || !user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    const { error: updateErr } = await supabase
+      .from('User')
+      .update({ password: hashedPassword, updatedAt: new Date() })
+      .eq('id', userId);
+
+    if (updateErr) throw updateErr;
+
+    res.status(200).json({ message: 'Password changed successfully' });
+  } catch (error: any) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+export const getMe = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('User')
+      .select('id, email, name, role, university, phone, createdAt')
+      .eq('id', userId)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ user });
   } catch (error: any) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
