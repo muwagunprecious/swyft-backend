@@ -3,6 +3,81 @@ import crypto from 'crypto';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
 
+const adjustTicketsWithHolds = async (tickets: any[]) => {
+  if (!tickets || tickets.length === 0) return tickets;
+  const ticketIds = tickets.map(t => t.id);
+
+  const { data: pendingItems, error } = await supabase
+    .from('OrderItem')
+    .select('ticketId, quantity, order:Order(status, createdAt)')
+    .in('ticketId', ticketIds);
+
+  if (error) {
+    console.error('Error fetching pending items for holds:', error);
+    return tickets;
+  }
+
+  const activeHoldsMap: Record<string, number> = {};
+  for (const item of (pendingItems || [])) {
+    const order = (item as any).order;
+    if (order && order.status === 'PENDING' && new Date(order.createdAt) > new Date(Date.now() - 5 * 60 * 1000)) {
+      activeHoldsMap[item.ticketId] = (activeHoldsMap[item.ticketId] || 0) + item.quantity;
+    }
+  }
+
+  return tickets.map(t => {
+    const holds = activeHoldsMap[t.id] || 0;
+    return {
+      ...t,
+      sold: Math.min(t.quantity, t.sold + holds),
+    };
+  });
+};
+
+const adjustAllEventsTicketsWithHolds = async (events: any[]) => {
+  if (!events || events.length === 0) return;
+  const ticketIds: string[] = [];
+  for (const event of events) {
+    if (event.Ticket) {
+      for (const t of event.Ticket) {
+        ticketIds.push(t.id);
+      }
+    }
+  }
+  if (ticketIds.length === 0) return;
+
+  const { data: pendingItems, error } = await supabase
+    .from('OrderItem')
+    .select('ticketId, quantity, order:Order(status, createdAt)')
+    .in('ticketId', ticketIds);
+
+  if (error) {
+    console.error('Error fetching pending items for batch holds:', error);
+    return;
+  }
+
+  const activeHoldsMap: Record<string, number> = {};
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  for (const item of (pendingItems || [])) {
+    const order = (item as any).order;
+    if (order && order.status === 'PENDING' && new Date(order.createdAt) > fiveMinutesAgo) {
+      activeHoldsMap[item.ticketId] = (activeHoldsMap[item.ticketId] || 0) + item.quantity;
+    }
+  }
+
+  for (const event of events) {
+    if (event.Ticket) {
+      event.Ticket = event.Ticket.map((t: any) => {
+        const holds = activeHoldsMap[t.id] || 0;
+        return {
+          ...t,
+          sold: Math.min(t.quantity, t.sold + holds),
+        };
+      });
+    }
+  }
+};
+
 export const getAllEvents = async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
@@ -20,6 +95,7 @@ export const getAllEvents = async (req: Request, res: Response) => {
 
     if (events) {
       events = events.filter((e: any) => !e.isSuspended);
+      await adjustAllEventsTicketsWithHolds(events);
     }
 
     res.status(200).json(events);
@@ -35,7 +111,7 @@ export const getEventById = async (req: Request, res: Response) => {
     console.log('getEventById called with id:', id);
     const { data: event, error } = await supabase
       .from('Event')
-      .select('*, Ticket(*), organizer:User(name), VoteCategory(*, Contestant(*))')
+      .select('*, Ticket(*), organizer:User(name, subaccountCode), VoteCategory(*, Contestant(*))')
       .eq('id', id)
       .single();
 
@@ -45,6 +121,10 @@ export const getEventById = async (req: Request, res: Response) => {
 
     if (error || !event) {
       return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (event.Ticket) {
+      event.Ticket = await adjustTicketsWithHolds(event.Ticket);
     }
 
     res.status(200).json(event);

@@ -5,6 +5,27 @@ import crypto from 'crypto';
 import { sendTicketEmail } from '../services/email.service';
 import bcrypt from 'bcryptjs';
 
+const getActiveHoldsForTicket = async (ticketId: string): Promise<number> => {
+  const { data: pendingItems, error } = await supabase
+    .from('OrderItem')
+    .select('quantity, order:Order(status, createdAt)')
+    .eq('ticketId', ticketId);
+
+  if (error) {
+    console.error('Error fetching pending items for holds:', error);
+    return 0;
+  }
+
+  let holds = 0;
+  for (const item of (pendingItems || [])) {
+    const order = (item as any).order;
+    if (order && order.status === 'PENDING' && new Date(order.createdAt) > new Date(Date.now() - 5 * 60 * 1000)) {
+      holds += item.quantity;
+    }
+  }
+  return holds;
+};
+
 export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
     const { items, name, email, phone, reference } = req.body;
@@ -113,8 +134,9 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         return res.status(404).json({ message: `Ticket ${item.ticketId} not found` });
       }
       
-      if (ticket.sold + item.quantity > ticket.quantity) {
-        return res.status(400).json({ message: `Not enough tickets available for ${ticket.name}` });
+      const holds = await getActiveHoldsForTicket(ticket.id);
+      if (ticket.sold + holds + item.quantity > ticket.quantity) {
+        return res.status(400).json({ message: `Not enough tickets available for ${ticket.name} (some are currently held in other carts)` });
       }
 
       totalPrice += ticket.price * item.quantity;
