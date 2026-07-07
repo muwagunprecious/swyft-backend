@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 import fetch from 'cross-fetch';
+import ws from 'ws';
 
 dotenv.config();
 
@@ -19,4 +20,7 @@ export const supabase = createClient(supabaseUrl || 'http://localhost', supabase
   global: {
     fetch: fetch,
   },
+  realtime: {
+    transport: ws,
+  }
 });

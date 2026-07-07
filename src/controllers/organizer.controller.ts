@@ -498,3 +498,12 @@ export const updateVotingSettings = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Error updating voting settings', error: error.message });
   }
 };
+
+export const getTeamMembers = async (req: AuthRequest, res: Response) => {
+  try {
+    res.status(200).json([]);
+  } catch (error: any) {
+    console.error('Error fetching team members:', error);
+    res.status(500).json({ message: 'Error fetching team members', error: error.message });
+  }
+};
