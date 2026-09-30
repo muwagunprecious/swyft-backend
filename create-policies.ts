@@ -1,7 +1,9 @@
 import { Client } from 'pg';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const client = new Client({
-  connectionString: 'postgresql://postgres.azauqcnijpdptlvxyapu:vFrNTBUnYB94oz0Y@aws-0-us-east-1.pooler.supabase.com:5432/postgres',
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
