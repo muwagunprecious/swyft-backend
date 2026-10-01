@@ -27,11 +27,33 @@ const transporter = nodemailer.createTransport({
     user: gmailUser,
     pass: gmailPass,
   },
+  connectionTimeout: 20000,
+  greetingTimeout: 15000,
+  socketTimeout: 30000,
   lookup: (hostname: string, options: any, callback?: any) => {
     const cb = typeof options === 'function' ? options : callback;
     dns.lookup(hostname, { family: 4 }, cb);
   },
 } as any);
+
+/**
+ * Robust SMTP delivery with automatic retry for transient socket drops/tarpitting
+ */
+const sendWithRetry = async (mailOptions: any, maxRetries = 3): Promise<any> => {
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await transporter.sendMail(mailOptions);
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`⚠️ SMTP attempt ${attempt}/${maxRetries} failed: ${err.message}. ${attempt < maxRetries ? 'Retrying in 2s...' : ''}`);
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+  }
+  throw lastError;
+};
 
 export interface ReceiptItem {
   name?: string;
@@ -75,10 +97,13 @@ export const sendOrderReceiptEmail = async ({
       minute: '2-digit',
     });
 
+    const textContent = `Order Confirmed!\n\nYou're all set. Your ticket passes and transaction receipt have been generated below.\n\nOrder Date: ${purchaseDate}\nBilled To: ${name}\nEvent: ${eventName}\nReference: ${reference}\nTotal Paid: ${formattedAmount}\n\nYour digital tickets and downloadable PDF admission passes have also been sent to your email.`;
+
     const mailOptions = {
       from: `"SWYFT Receipts" <${gmailUser}>`,
       to: email,
       subject: `Order Confirmed: ${eventName} [${reference}]`,
+      text: textContent,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 14px rgba(40,44,53,0.08);">
           
@@ -193,7 +218,7 @@ export const sendOrderReceiptEmail = async ({
       `,
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const info = await sendWithRetry(mailOptions);
     console.log(`✉️ Receipt email successfully sent to ${email} (Message ID: ${info.messageId})`);
     return info;
   } catch (error) {
@@ -253,10 +278,13 @@ export const sendTicketPassEmail = async ({
       university,
     });
 
+    const textContent = `Hi ${name},\n\nHere is your official admission pass for ${eventName}.\n\nDate: ${date}\nVenue: ${venue} ${university ? `• ${university}` : ''}\nTicket Tier: ${ticketType}\nBooking Reference: ${reference}\nVerification Token: ${verificationId}\n\nPresent this verification token or your QR code (see attached printable PDF) at the gate for admission.\n\nThank you for choosing SWYFT!`;
+
     const mailOptions = {
       from: `"SWYFT Tickets" <${gmailUser}>`,
       to: email,
       subject: `Your Admission Ticket: ${eventName}`,
+      text: textContent,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 14px rgba(40,44,53,0.08);">
           
@@ -360,7 +388,7 @@ export const sendTicketPassEmail = async ({
       ],
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const info = await sendWithRetry(mailOptions);
     console.log(`✉️ Ticket pass email with PDF attached sent to ${email} (Message ID: ${info.messageId})`);
     return info;
   } catch (error) {
