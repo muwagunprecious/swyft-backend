@@ -18,7 +18,7 @@ export const supabase = createClient(supabaseUrl || 'http://localhost', supabase
     persistSession: false,
   },
   global: {
-    fetch: fetch,
+    fetch: typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch,
   },
   realtime: {
     transport: ws,
