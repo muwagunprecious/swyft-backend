@@ -21,6 +21,6 @@ export const supabase = createClient(supabaseUrl || 'http://localhost', supabase
     fetch: typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch,
   },
   realtime: {
-    transport: ws,
+    transport: ws as any,
   }
 });

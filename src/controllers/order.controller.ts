@@ -2,8 +2,85 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
 import crypto from 'crypto';
-import { sendTicketEmail } from '../services/email.service';
+import { sendOrderReceiptEmail, sendTicketPassEmail } from '../services/email.service';
 import bcrypt from 'bcryptjs';
+
+/**
+ * Dispatch post-payment emails:
+ * 1. Order Receipt email FIRST
+ * 2. Ticket Pass email (with downloadable PDF attached) SECOND for each ticket item
+ */
+const dispatchPostPaymentEmails = async (payment: any) => {
+  try {
+    const user = payment.order?.user;
+    if (!user || !user.email) {
+      console.warn('⚠️ dispatchPostPaymentEmails: No recipient email found for order', payment.orderId);
+      return;
+    }
+
+    const orderItems = payment.order?.orderItems || [];
+    const items = orderItems.map((item: any) => ({
+      ticketName: item.ticket?.name || 'General Admission',
+      quantity: item.quantity,
+      price: item.ticket?.price || 0,
+    }));
+
+    const firstEvent = orderItems[0]?.ticket?.event;
+    const eventName = firstEvent?.title || 'Campus Event';
+
+    // 1. Send Order Receipt Email FIRST
+    console.log(`🚀 Dispatching receipt email FIRST to ${user.email}...`);
+    try {
+      await sendOrderReceiptEmail({
+        email: user.email,
+        name: user.name || 'Valued Guest',
+        eventName,
+        reference: payment.reference,
+        amount: payment.amount,
+        orderId: payment.orderId,
+        phone: user.phone || undefined,
+        items,
+      });
+      console.log(`✅ Order receipt email sent successfully to ${user.email}`);
+    } catch (receiptErr) {
+      console.error(`❌ Failed to send receipt email to ${user.email}:`, receiptErr);
+    }
+
+    // 2. Send Ticket Pass Email with attached PDF SECOND
+    for (const item of orderItems) {
+      try {
+        const event = item.ticket?.event;
+        const formattedDate = event?.date
+          ? new Date(event.date).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+          : 'Event Date TBA';
+
+        console.log(`🚀 Dispatching ticket pass email SECOND to ${user.email} (Token: ${item.qrCode})...`);
+        await sendTicketPassEmail({
+          email: user.email,
+          name: user.name || 'Valued Guest',
+          eventName: event?.title || 'Campus Event',
+          ticketType: item.ticket?.name || 'Admission Pass',
+          venue: event?.location || 'Campus Center',
+          date: formattedDate,
+          verificationId: item.qrCode,
+          reference: payment.reference,
+          phone: user.phone || undefined,
+          university: user.university || undefined,
+        });
+        console.log(`✅ Ticket pass with PDF attachment sent to ${user.email}`);
+      } catch (ticketErr) {
+        console.error(`❌ Failed to send ticket pass email to ${user.email}:`, ticketErr);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error in dispatchPostPaymentEmails:', error);
+  }
+};
 
 const getActiveHoldsForTicket = async (ticketId: string): Promise<number> => {
   const { data: pendingItems, error } = await supabase
@@ -316,34 +393,21 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
       throw upOrderErr;
     }
 
-    // Parallelize ticket updates and background email deliveries to eliminate sequential roundtrip delays
+    // Update sold counts for each ticket
     const ticketPromises = payment.order.orderItems.map(async (item: any) => {
-      // Fetch sold count
       const { data: ticket } = await supabase.from('Ticket').select('sold').eq('id', item.ticketId).single();
-      
-      // Update sold count
       await supabase
         .from('Ticket')
         .update({ sold: (ticket?.sold || 0) + item.quantity })
         .eq('id', item.ticketId);
-      
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${item.qrCode}&color=4F46E5`;
-      
-      // Dispatch SMTP email delivery in the background (DO NOT await it to keep checkouts instant!)
-      sendTicketEmail({
-        email: payment.order.user.email,
-        name: payment.order.user.name,
-        eventName: item.ticket.event.title,
-        ticketType: item.ticket.name,
-        qrUrl: qrUrl,
-        verificationId: item.qrCode,
-        reference: payment.reference,
-        phone: payment.order.user.phone || undefined,
-        matricNumber: payment.order.user.matricNumber || undefined,
-      }).catch(err => console.error("Email send failed in background:", err));
     });
 
     await Promise.all(ticketPromises);
+
+    // Dispatch emails in background: Receipt FIRST, Ticket + downloadable PDF SECOND
+    dispatchPostPaymentEmails(payment).catch(err => {
+      console.error("⚠️ Background email dispatch failed:", err);
+    });
 
     console.log(`[verifyPayment] Payment processing completed successfully for reference: ${reference}`);
     res.status(200).json({ message: 'Payment successful', orderId: payment.orderId });
@@ -570,7 +634,7 @@ export const paystackWebhook = async (req: Request, res: Response) => {
         .eq('id', payment.orderId);
       if (upOrderErr) throw upOrderErr;
 
-      // 3. Update sold tickets counts and dispatch secure email QR codes
+      // 3. Update sold tickets counts
       for (const item of payment.order.orderItems) {
         const { data: ticket } = await supabase
           .from('Ticket')
@@ -582,21 +646,10 @@ export const paystackWebhook = async (req: Request, res: Response) => {
           .from('Ticket')
           .update({ sold: (ticket?.sold || 0) + item.quantity })
           .eq('id', item.ticketId);
-        
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${item.qrCode}&color=4F46E5`;
-        
-        await sendTicketEmail({
-          email: payment.order.user.email,
-          name: payment.order.user.name,
-          eventName: item.ticket.event.title,
-          ticketType: item.ticket.name,
-          qrUrl: qrUrl,
-          verificationId: item.qrCode,
-          reference: payment.reference,
-          phone: payment.order.user.phone || undefined,
-          matricNumber: payment.order.user.matricNumber || undefined,
-        }).catch(err => console.error("Webhook: Failed to send ticket email:", err));
       }
+
+      // 4. Dispatch post-payment emails (Receipt first, Ticket + PDF second)
+      await dispatchPostPaymentEmails(payment);
 
       console.log(`🎉 Webhook: Successfully processed and finalized order for reference '${reference}'!`);
     }
