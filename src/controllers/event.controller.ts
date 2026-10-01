@@ -105,26 +105,66 @@ export const getAllEvents = async (req: Request, res: Response) => {
   }
 };
 
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+}
+
 export const getEventById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    console.log('getEventById called with id:', id);
-    const { data: event, error } = await supabase
-      .from('Event')
-      .select('*, Ticket(*), organizer:User(name, subaccountCode), VoteCategory(*, Contestant(*))')
-      .eq('id', id)
-      .single();
+    console.log('getEventById called with id/slug:', id);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-    if (error) {
-      console.error('getEventById Supabase error:', error);
+    let event: any = null;
+
+    if (isUUID) {
+      const { data, error } = await supabase
+        .from('Event')
+        .select('*, Ticket(*), organizer:User(name, subaccountCode), VoteCategory(*, Contestant(*))')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) console.error('getEventById UUID error:', error);
+      event = data;
+    } else {
+      // First try matching slug
+      const { data: bySlug } = await supabase
+        .from('Event')
+        .select('*, Ticket(*), organizer:User(name, subaccountCode), VoteCategory(*, Contestant(*))')
+        .eq('slug', id)
+        .maybeSingle();
+
+      if (bySlug) {
+        event = bySlug;
+      } else {
+        // Fallback: match by title with spaces
+        const { data: byTitle } = await supabase
+          .from('Event')
+          .select('*, Ticket(*), organizer:User(name, subaccountCode), VoteCategory(*, Contestant(*))')
+          .ilike('title', id.replace(/-/g, ' '))
+          .maybeSingle();
+        event = byTitle;
+      }
     }
 
-    if (error || !event) {
+    if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     if (event.Ticket) {
       event.Ticket = await adjustTicketsWithHolds(event.Ticket);
+    }
+
+    if (!event.slug && event.title) {
+      event.slug = slugify(event.title);
+      supabase.from('Event').update({ slug: event.slug }).eq('id', event.id).then();
     }
 
     res.status(200).json(event);
@@ -164,6 +204,19 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
       return res.status(200).json(existingDuplicate);
     }
 
+    // Generate slug from title
+    const baseSlug = slugify(title);
+    let finalSlug = baseSlug || `event-${Date.now()}`;
+    const { data: existingSlug } = await supabase
+      .from('Event')
+      .select('id')
+      .eq('slug', finalSlug)
+      .maybeSingle();
+
+    if (existingSlug) {
+      finalSlug = `${finalSlug}-${Date.now().toString().slice(-4)}`;
+    }
+
     // Upload image locally if base64 provided
     let finalBannerImage = '/images/party.png';
       if (bannerImage && bannerImage.startsWith('data:image/')) {
@@ -181,6 +234,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
       .from('Event')
       .insert({
         id: eventId,
+        slug: finalSlug,
         title,
         description,
         bannerImage: finalBannerImage,

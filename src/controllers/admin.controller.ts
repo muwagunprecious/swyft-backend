@@ -177,12 +177,27 @@ export const getPayouts = async (req: AuthRequest, res: Response) => {
   try {
     const { data: payouts, error } = await supabase
       .from('Payout')
-      .select('*')
+      .select('*, user:User(id, name, email, phone, bankName, accountNumber)')
       .order('createdAt', { ascending: false });
 
     if (error) throw error;
 
-    res.status(200).json(payouts || []);
+    const formatted = (payouts || []).map((p: any) => ({
+      id: p.id,
+      amount: p.amount,
+      status: p.status,
+      bankName: p.bankName || p.user?.bankName || 'Bank Transfer',
+      accountNumber: p.accountNumber || p.user?.accountNumber || '—',
+      accountName: p.accountName || p.user?.name || 'Organizer',
+      organizerName: p.user?.name || p.accountName || 'Unknown Organizer',
+      organizerEmail: p.user?.email || 'N/A',
+      organizerPhone: p.user?.phone || 'N/A',
+      reference: p.reference || p.id,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
+    res.status(200).json(formatted);
   } catch (error: any) {
     console.error('Error fetching admin payouts:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -218,11 +233,50 @@ export const releasePayout = async (req: AuthRequest, res: Response) => {
     if (updateErr) throw updateErr;
 
     res.status(200).json({
-      message: 'Payout successfully released.',
+      message: 'Payout successfully released and approved.',
       payout: updatedPayout,
     });
   } catch (error: any) {
     console.error('Error releasing payout:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// 7b. Reject Payout Request
+export const rejectPayout = async (req: AuthRequest, res: Response) => {
+  try {
+    const { payoutId } = req.params;
+    const { note } = req.body || {};
+
+    const { data: payout, error: fetchErr } = await supabase
+      .from('Payout')
+      .select('id, status')
+      .eq('id', payoutId)
+      .single();
+
+    if (fetchErr || !payout) {
+      return res.status(404).json({ message: 'Payout request not found' });
+    }
+
+    if (payout.status !== 'PENDING') {
+      return res.status(400).json({ message: `Cannot reject payout that is already ${payout.status}.` });
+    }
+
+    const { data: updatedPayout, error: updateErr } = await supabase
+      .from('Payout')
+      .update({ status: 'REJECTED', note: note || 'Rejected by administrator', updatedAt: new Date().toISOString() })
+      .eq('id', payoutId)
+      .select('*')
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.status(200).json({
+      message: 'Payout request rejected.',
+      payout: updatedPayout,
+    });
+  } catch (error: any) {
+    console.error('Error rejecting payout:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };

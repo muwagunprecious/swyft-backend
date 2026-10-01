@@ -8,6 +8,7 @@ import {
   toggleEventStatus,
   getPayouts,
   releasePayout,
+  rejectPayout,
   getTickets,
   getUserAuditTrail,
 } from '../controllers/admin.controller';
@@ -24,6 +25,7 @@ router.get('/events', getEvents);
 router.post('/events/:eventId/toggle-status', toggleEventStatus);
 router.get('/payouts', getPayouts);
 router.post('/payouts/:payoutId/release', releasePayout);
+router.post('/payouts/:payoutId/reject', rejectPayout);
 router.get('/tickets', getTickets);
 router.get('/users/:userId/audit', getUserAuditTrail);
 

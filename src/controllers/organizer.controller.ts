@@ -507,3 +507,233 @@ export const getTeamMembers = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Error fetching team members', error: error.message });
   }
 };
+
+export const getWallet = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizerId = req.user?.userId;
+    if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    // 1. Fetch User Payout & Profile Details
+    const { data: user } = await supabase
+      .from('User')
+      .select('name, email, phone, bankName, accountNumber, bankCode')
+      .eq('id', organizerId)
+      .single();
+
+    // 2. Fetch Events for this organizer
+    const { data: events } = await supabase
+      .from('Event')
+      .select('id, title')
+      .eq('organizerId', organizerId);
+
+    const eventIds = (events || []).map((e: any) => e.id);
+
+    // 3. Fetch Tickets
+    let totalRevenue = 0;
+    const transactions: any[] = [];
+
+    if (eventIds.length > 0) {
+      const { data: tickets } = await supabase
+        .from('Ticket')
+        .select('id, name, price, eventId')
+        .in('eventId', eventIds);
+
+      const ticketIds = (tickets || []).map((t: any) => t.id);
+
+      if (ticketIds.length > 0) {
+        // Fetch ONLY successful/completed order items
+        const { data: completedItems, error: itemsErr } = await supabase
+          .from('OrderItem')
+          .select('id, quantity, ticket:Ticket(name, price, event:Event(title)), order:Order!inner(id, createdAt, status, user:User(name, email))')
+          .in('ticketId', ticketIds)
+          .eq('order.status', 'COMPLETED')
+          .order('id', { ascending: false });
+
+        if (itemsErr) {
+          console.error('Error fetching completed items for wallet:', itemsErr);
+        } else if (completedItems) {
+          for (const item of completedItems as any[]) {
+            const itemAmount = (item.ticket?.price || 0) * (item.quantity || 1);
+            totalRevenue += itemAmount;
+            transactions.push({
+              id: item.id,
+              orderId: item.order?.id,
+              event: item.ticket?.event?.title || 'Event',
+              ticketType: item.ticket?.name || 'Ticket',
+              quantity: item.quantity || 1,
+              amount: itemAmount,
+              customer: item.order?.user?.name || item.order?.user?.email || 'Guest Attendee',
+              date: item.order?.createdAt,
+              status: 'Completed',
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Fetch Payouts / Withdrawals
+    const { data: payouts, error: payoutsErr } = await supabase
+      .from('Payout')
+      .select('*')
+      .eq('userId', organizerId)
+      .order('createdAt', { ascending: false });
+
+    if (payoutsErr) {
+      console.error('Error fetching payouts for wallet:', payoutsErr);
+    }
+
+    let withdrawnAmount = 0;
+    let pendingWithdrawals = 0;
+
+    (payouts || []).forEach((p: any) => {
+      if (p.status === 'COMPLETED') {
+        withdrawnAmount += p.amount || 0;
+      } else if (p.status === 'PENDING') {
+        pendingWithdrawals += p.amount || 0;
+      }
+    });
+
+    const availableBalance = Math.max(0, totalRevenue - withdrawnAmount - pendingWithdrawals);
+
+    res.status(200).json({
+      totalRevenue,
+      availableBalance,
+      pendingWithdrawals,
+      withdrawnAmount,
+      bankDetails: {
+        bankName: user?.bankName || '',
+        accountNumber: user?.accountNumber || '',
+        accountName: user?.name || '',
+      },
+      transactions,
+      payouts: payouts || [],
+    });
+  } catch (error: any) {
+    console.error('getWallet error:', error);
+    res.status(500).json({ message: 'Error loading wallet', error: error.message });
+  }
+};
+
+export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizerId = req.user?.userId;
+    if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { amount, bankName, accountNumber, accountName } = req.body;
+    const withdrawAmount = parseFloat(amount);
+
+    if (!withdrawAmount || isNaN(withdrawAmount) || withdrawAmount <= 0) {
+      return res.status(400).json({ message: 'Please enter a valid withdrawal amount.' });
+    }
+
+    if (withdrawAmount < 500) {
+      return res.status(400).json({ message: 'Minimum withdrawal amount is ₦500.' });
+    }
+
+    // 1. Fetch User details
+    const { data: user } = await supabase
+      .from('User')
+      .select('name, email, phone, bankName, accountNumber')
+      .eq('id', organizerId)
+      .single();
+
+    const finalBank = bankName || user?.bankName;
+    const finalAccount = accountNumber || user?.accountNumber;
+    const finalName = accountName || user?.name;
+
+    if (!finalBank || !finalAccount) {
+      return res.status(400).json({ message: 'Bank name and account number are required for withdrawal.' });
+    }
+
+    // 2. Calculate current available balance strictly from successful ticket payments
+    const { data: events } = await supabase
+      .from('Event')
+      .select('id')
+      .eq('organizerId', organizerId);
+
+    const eventIds = (events || []).map((e: any) => e.id);
+    let totalRevenue = 0;
+
+    if (eventIds.length > 0) {
+      const { data: tickets } = await supabase
+        .from('Ticket')
+        .select('id, price')
+        .in('eventId', eventIds);
+
+      const ticketIds = (tickets || []).map((t: any) => t.id);
+      if (ticketIds.length > 0) {
+        const { data: completedItems } = await supabase
+          .from('OrderItem')
+          .select('quantity, ticket:Ticket(price), order:Order!inner(status)')
+          .in('ticketId', ticketIds)
+          .eq('order.status', 'COMPLETED');
+
+        (completedItems || []).forEach((item: any) => {
+          totalRevenue += (item.ticket?.price || 0) * (item.quantity || 1);
+        });
+      }
+    }
+
+    // 3. Fetch past payouts to check balance
+    const { data: payouts } = await supabase
+      .from('Payout')
+      .select('amount, status')
+      .eq('userId', organizerId);
+
+    let alreadyWithdrawn = 0;
+    (payouts || []).forEach((p: any) => {
+      if (p.status === 'COMPLETED' || p.status === 'PENDING') {
+        alreadyWithdrawn += p.amount || 0;
+      }
+    });
+
+    const availableBalance = totalRevenue - alreadyWithdrawn;
+
+    if (withdrawAmount > availableBalance) {
+      return res.status(400).json({
+        message: `Insufficient funds. Your available balance is ₦${Math.max(0, availableBalance).toLocaleString()}.`,
+      });
+    }
+
+    // 4. Create Payout Request in PENDING status
+    const payoutId = crypto.randomUUID();
+    const { data: newPayout, error: payoutErr } = await supabase
+      .from('Payout')
+      .insert({
+        id: payoutId,
+        userId: organizerId,
+        amount: withdrawAmount,
+        bankName: finalBank,
+        accountNumber: finalAccount,
+        accountName: finalName,
+        status: 'PENDING',
+        reference: `WD-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (payoutErr) {
+      console.error('Error creating withdrawal request:', payoutErr);
+      throw payoutErr;
+    }
+
+    // Also update user's saved bank if not set
+    if (!user?.bankName || !user?.accountNumber) {
+      await supabase
+        .from('User')
+        .update({ bankName: finalBank, accountNumber: finalAccount })
+        .eq('id', organizerId);
+    }
+
+    res.status(201).json({
+      message: 'Withdrawal request submitted successfully! Funds will be reviewed and released by an administrator.',
+      payout: newPayout,
+    });
+  } catch (error: any) {
+    console.error('requestWithdrawal error:', error);
+    res.status(500).json({ message: 'Error submitting withdrawal', error: error.message });
+  }
+};
+

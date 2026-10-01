@@ -42,6 +42,7 @@ model User {
   department    Department? @relation(fields: [departmentId], references: [id])
   events        Event[]   @relation("OrganizerEvents")
   orders        Order[]
+  payouts       Payout[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -69,6 +70,7 @@ model Department {
 
 model Event {
   id            String      @id @default(uuid())
+  slug          String?
   title         String
   description   String
   bannerImage   String
@@ -168,3 +170,19 @@ model Vote {
   contestant    Contestant   @relation(fields: [contestantId], references: [id])
   createdAt     DateTime     @default(now())
 }
+
+model Payout {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  amount        Float
+  bankName      String
+  accountNumber String
+  accountName   String?
+  status        String   @default("PENDING") // PENDING, COMPLETED, REJECTED
+  reference     String?
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
