@@ -46,7 +46,10 @@ const dispatchPostPaymentEmails = async (payment: any) => {
       console.error(`❌ Failed to send receipt email to ${user.email}:`, receiptErr);
     }
 
-    // 2. Send Ticket Pass Email with attached PDF SECOND
+    // 2. Pause 2.5s between emails to prevent mail servers flagging back-to-back delivery as spam
+    await new Promise((r) => setTimeout(r, 2500));
+
+    // 3. Send Ticket Pass Email with attached PDF SECOND
     for (const item of orderItems) {
       try {
         const event = item.ticket?.event;

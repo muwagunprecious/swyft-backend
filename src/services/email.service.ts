@@ -100,10 +100,14 @@ export const sendOrderReceiptEmail = async ({
     const textContent = `Order Confirmed!\n\nYou're all set. Your ticket passes and transaction receipt have been generated below.\n\nOrder Date: ${purchaseDate}\nBilled To: ${name}\nEvent: ${eventName}\nReference: ${reference}\nTotal Paid: ${formattedAmount}\n\nYour digital tickets and downloadable PDF admission passes have also been sent to your email.`;
 
     const mailOptions = {
-      from: `"SWYFT Receipts" <${gmailUser}>`,
+      from: `"Swyft Tickets" <${gmailUser}>`,
+      replyTo: `"Swyft Support" <${gmailUser}>`,
       to: email,
-      subject: `Order Confirmed: ${eventName} [${reference}]`,
+      subject: `Order Confirmed: ${eventName} (Ref: ${reference})`,
       text: textContent,
+      headers: {
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+      },
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 14px rgba(40,44,53,0.08);">
           
@@ -281,10 +285,14 @@ export const sendTicketPassEmail = async ({
     const textContent = `Hi ${name},\n\nHere is your official admission pass for ${eventName}.\n\nDate: ${date}\nVenue: ${venue} ${university ? `• ${university}` : ''}\nTicket Tier: ${ticketType}\nBooking Reference: ${reference}\nVerification Token: ${verificationId}\n\nPresent this verification token or your QR code (see attached printable PDF) at the gate for admission.\n\nThank you for choosing SWYFT!`;
 
     const mailOptions = {
-      from: `"SWYFT Tickets" <${gmailUser}>`,
+      from: `"Swyft Tickets" <${gmailUser}>`,
+      replyTo: `"Swyft Support" <${gmailUser}>`,
       to: email,
       subject: `Your Admission Ticket: ${eventName}`,
       text: textContent,
+      headers: {
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+      },
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 14px rgba(40,44,53,0.08);">
           
@@ -338,7 +346,7 @@ export const sendTicketPassEmail = async ({
               <!-- QR Code Check-in Area -->
               <div style="padding: 24px; text-align: center; background-color: #ffffff;">
                 <div style="display: inline-block; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background-color: #ffffff; margin-bottom: 14px;">
-                  <img src="cid:ticketqrcode" alt="Admission QR Code" width="180" height="180" style="display: block; margin: 0 auto;" />
+                  <img src="data:image/png;base64,${qrBuffer.toString('base64')}" alt="Admission QR Code" width="180" height="180" style="display: block; margin: 0 auto; border: 0;" />
                 </div>
                 
                 <p style="margin: 0 0 4px 0; font-size: 11px; color: #6f7287; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
@@ -367,8 +375,9 @@ export const sendTicketPassEmail = async ({
             </div>
 
             <!-- Footer -->
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
-              Questions about this ticket? Contact event support at ${gmailUser}.<br>
+            <p style="font-size: 11px; color: #888888; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 16px; line-height: 1.5;">
+              This is a transactional confirmation from Swyft Ticketing for your purchase.<br>
+              Questions? Contact support at ${gmailUser}.<br>
               © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
             </p>
           </div>
@@ -379,11 +388,6 @@ export const sendTicketPassEmail = async ({
           filename: `ticket-${verificationId}.pdf`,
           content: pdfBuffer,
           contentType: 'application/pdf',
-        },
-        {
-          filename: 'qrcode.png',
-          content: qrBuffer,
-          cid: 'ticketqrcode', // Inline embedded image
         },
       ],
     };
@@ -396,3 +400,82 @@ export const sendTicketPassEmail = async ({
     throw error;
   }
 };
+
+export interface SendPasswordResetParams {
+  email: string;
+  name: string;
+  resetCode: string;
+}
+
+/**
+ * 3. PASSWORD RESET EMAIL WITH 6-DIGIT VERIFICATION CODE
+ */
+export const sendPasswordResetEmail = async ({
+  email,
+  name,
+  resetCode,
+}: SendPasswordResetParams) => {
+  try {
+    const textContent = `Hi ${name || 'there'},\n\nWe received a request to reset your password on Swyft. Use the 6-digit verification code below to reset your password:\n\n${resetCode}\n\nThis code will expire in 15 minutes. If you did not request this, you can safely ignore this email.\n\nBest regards,\nThe Swyft Team`;
+
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8f7fa; padding: 32px 16px; min-height: 100%;">
+        <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <!-- Header -->
+          <div style="background-color: #d1410c; padding: 24px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">SWYFT</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 6px 0 0 0; font-size: 14px;">Password Recovery</p>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 32px 28px;">
+            <h2 style="font-size: 20px; font-weight: 700; color: #39364f; margin: 0 0 12px 0;">Reset Your Password</h2>
+            <p style="font-size: 14px; color: #6f7287; line-height: 1.6; margin: 0 0 24px 0;">
+              Hello ${name ? `<strong>${name}</strong>` : 'there'}, we received a request to reset the password for your Swyft account (${email}).
+            </p>
+
+            <div style="background-color: #fff9f6; border: 1.5px dashed #d1410c; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: #6f7287; text-transform: uppercase; letter-spacing: 1px;">Your 6-Digit Verification Code</p>
+              <span style="font-family: monospace; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #d1410c; display: inline-block;">
+                ${resetCode}
+              </span>
+              <p style="margin: 8px 0 0 0; font-size: 12px; color: #9ca3af;">Valid for 15 minutes</p>
+            </div>
+
+            <p style="font-size: 13px; color: #6f7287; line-height: 1.5; margin: 0 0 20px 0;">
+              Enter this code on the password reset page to set a new password. If you did not make this request, you can safely ignore this email.
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0 16px 0;" />
+
+            <!-- Footer -->
+            <p style="font-size: 11px; color: #9ca3af; text-align: center; margin: 0; line-height: 1.5;">
+              This email was sent to ${email} for password assistance.<br/>
+              © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Swyft Security" <${gmailUser}>`,
+      to: email,
+      subject: `Your Swyft Password Reset Code: ${resetCode}`,
+      text: textContent,
+      html: htmlContent,
+      priority: 'high',
+      headers: {
+        'X-Entity-Ref-ID': `pwd-reset-${Date.now()}`,
+      },
+    };
+
+    const info = await sendWithRetry(mailOptions);
+    console.log(`✉️ Password reset email sent to ${email} (Message ID: ${info.messageId})`);
+    return info;
+  } catch (error) {
+    console.error('❌ Error sending password reset email:', error);
+    throw error;
+  }
+};
+

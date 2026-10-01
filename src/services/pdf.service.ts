@@ -26,6 +26,13 @@ export async function generateTicketPdf(data: TicketPdfData): Promise<Buffer> {
     const doc = new PDFDocument({
       size: [380, 580], // Compact, modern ticket card dimensions
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      info: {
+        Title: `${data.eventName} Admission Pass`,
+        Author: 'Swyft Tickets',
+        Subject: 'Event Ticket Pass',
+        Creator: 'Swyft Ticketing Platform',
+        Producer: 'Swyft Engine',
+      },
     });
 
     const buffers: Buffer[] = [];

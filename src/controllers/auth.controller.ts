@@ -2,6 +2,14 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
+import { sendPasswordResetEmail } from '../services/email.service';
+
+interface ResetRecord {
+  code: string;
+  expiresAt: number;
+  attempts: number;
+}
+const resetStore = new Map<string, ResetRecord>();
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -248,3 +256,110 @@ export const getMe = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if user exists in database
+    const { data: user, error } = await supabase
+      .from('User')
+      .select('id, name, email')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error finding user for password reset:', error);
+      return res.status(500).json({ message: 'Database error while checking user' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with this email address.' });
+    }
+
+    // Generate random 6-digit code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in resetStore with 15 minute expiry
+    resetStore.set(cleanEmail, {
+      code: resetCode,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      attempts: 0,
+    });
+
+    // Send reset email asynchronously
+    sendPasswordResetEmail({
+      email: user.email,
+      name: user.name,
+      resetCode,
+    }).catch(err => {
+      console.error('Failed to send password reset email in background:', err);
+    });
+
+    res.status(200).json({
+      message: 'Password reset code has been sent to your email.',
+      email: cleanEmail,
+    });
+  } catch (error: any) {
+    console.error('forgotPassword error:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: 'Email, verification code, and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim();
+
+    const record = resetStore.get(cleanEmail);
+    if (!record || record.expiresAt < Date.now()) {
+      return res.status(400).json({ message: 'Reset code has expired or was not requested. Please request a new code.' });
+    }
+
+    if (record.code !== cleanCode) {
+      record.attempts += 1;
+      if (record.attempts >= 5) {
+        resetStore.delete(cleanEmail);
+        return res.status(400).json({ message: 'Too many invalid attempts. Please request a new code.' });
+      }
+      return res.status(400).json({ message: 'Invalid 6-digit verification code.' });
+    }
+
+    // Code is valid! Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    const { error: updateError } = await supabase
+      .from('User')
+      .update({ password: hashedPassword, updatedAt: new Date() })
+      .eq('email', cleanEmail);
+
+    if (updateError) {
+      console.error('Error updating password:', updateError);
+      return res.status(500).json({ message: 'Failed to update password' });
+    }
+
+    // Clear reset code
+    resetStore.delete(cleanEmail);
+
+    res.status(200).json({ message: 'Password reset successfully! You can now log in.' });
+  } catch (error: any) {
+    console.error('resetPassword error:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+

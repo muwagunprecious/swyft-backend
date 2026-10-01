@@ -149,6 +149,21 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Invalid date format' });
     }
 
+    // Deduplication check: If an event with the same title was created by this organizer in the last 60s, return it
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: existingDuplicate } = await supabase
+      .from('Event')
+      .select('*, Ticket(*)')
+      .eq('organizerId', organizerId)
+      .eq('title', title.trim())
+      .gte('createdAt', oneMinuteAgo)
+      .maybeSingle();
+
+    if (existingDuplicate) {
+      console.log('Duplicate event creation detected, returning existing event:', existingDuplicate.id);
+      return res.status(200).json(existingDuplicate);
+    }
+
     // Upload image locally if base64 provided
     let finalBannerImage = '/images/party.png';
       if (bannerImage && bannerImage.startsWith('data:image/')) {
@@ -199,6 +214,8 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
       if (ticketsError) {
         console.error('Ticket insert error:', ticketsError);
+        // Rollback event creation so we don't leave an orphan/duplicate event
+        await supabase.from('Event').delete().eq('id', event.id);
         throw ticketsError;
       }
     }
