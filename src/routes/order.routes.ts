@@ -11,8 +11,9 @@ router.post('/webhook', paystackWebhook);
 router.post('/', optionalAuthenticate, createOrder);
 router.post('/verify-payment/:reference', optionalAuthenticate, verifyPayment);
 
-// These routes require authentication
-router.post('/verify-ticket/:qrCode', authenticate, verifyTicket);
+// Ticket verification routes (GET preview details upon QR scan, POST check-in/admit)
+router.get('/verify-ticket/:qrCode', verifyTicket);
+router.post('/verify-ticket/:qrCode', optionalAuthenticate, verifyTicket);
 router.get('/my-tickets', optionalAuthenticate, getMyTickets);
 
 export default router;

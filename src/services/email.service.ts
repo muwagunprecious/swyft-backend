@@ -295,8 +295,9 @@ export const sendTicketPassEmail = async ({
   university,
 }: SendTicketParams) => {
   try {
-    // 1. Generate QR Code image buffer (for inline rendering in HTML)
-    const qrBuffer = await QRCode.toBuffer(verificationId, {
+    // 1. Generate QR Code image buffer pointing to verification page on swyft-ticket.name.ng
+    const qrTargetUrl = `https://swyft-ticket.name.ng/verify?code=${encodeURIComponent(verificationId)}`;
+    const qrBuffer = await QRCode.toBuffer(qrTargetUrl, {
       width: 250,
       margin: 1,
       color: {

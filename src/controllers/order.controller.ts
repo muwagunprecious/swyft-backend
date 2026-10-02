@@ -427,7 +427,14 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
 
 export const verifyTicket = async (req: AuthRequest, res: Response) => {
   try {
-    const { qrCode } = req.params;
+    let rawCode = req.params.qrCode || (req.query.code as string) || '';
+    // Extract code if a full URL like https://swyft-ticket.name.ng/verify?code=OTX-xxx was passed
+    const match = rawCode.match(/(?:code=|^)(OTX-[a-zA-Z0-9-]+)/i);
+    const qrCode = match ? match[1] : rawCode.trim();
+
+    if (!qrCode) {
+      return res.status(400).json({ message: 'No ticket verification code provided', status: 'invalid' });
+    }
     
     const { data: item, error } = await supabase
       .from('OrderItem')
@@ -435,42 +442,63 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
       .eq('qrCode', qrCode)
       .single();
 
-    if (error || !item) return res.status(404).json({ message: 'Invalid ticket', status: 'invalid' });
-    if (item.isUsed) return res.status(400).json({ 
-      message: 'Ticket already used', 
-      status: 'used',
-      attendee: { 
-        name: item.order.user.name, 
-        email: item.order.user.email,
-        phone: item.order.user.phone || '',
-        matricNumber: item.order.user.matricNumber || '',
-        type: item.ticket.name, 
-        event: item.ticket.event.title,
-        price: item.ticket.price
-      }
-    });
+    if (error || !item) {
+      return res.status(404).json({ message: 'Invalid ticket or ticket not found', status: 'invalid' });
+    }
 
+    const attendee = {
+      id: item.id,
+      name: item.order?.user?.name || 'Valued Guest',
+      email: item.order?.user?.email || '',
+      phone: item.order?.user?.phone || '',
+      matricNumber: item.order?.user?.matricNumber || '',
+      university: item.order?.user?.university || '',
+      ticketType: item.ticket?.name || 'General Admission',
+      type: item.ticket?.name || 'General Admission',
+      event: item.ticket?.event?.title || 'Swyft Event',
+      eventDate: item.ticket?.event?.date || '',
+      eventTime: item.ticket?.event?.time || '',
+      venue: item.ticket?.event?.venue || item.ticket?.event?.location || 'Venue TBA',
+      price: item.ticket?.price ?? 0,
+      quantity: item.quantity || 1,
+      reference: item.order?.reference || item.qrCode,
+      qrCode: item.qrCode,
+      isUsed: Boolean(item.isUsed),
+    };
+
+    if (item.isUsed) {
+      return res.status(200).json({ 
+        message: 'This ticket has already been used and checked in.', 
+        status: 'used',
+        attendee,
+      });
+    }
+
+    // If it's a GET request (lookup preview upon scanning), return the details without consuming the ticket!
+    if (req.method === 'GET') {
+      return res.status(200).json({ 
+        message: 'Valid ticket', 
+        status: 'valid',
+        attendee,
+      });
+    }
+
+    // POST/PUT request: Confirm check-in / mark as used
     const { error: updateErr } = await supabase
       .from('OrderItem')
       .update({ isUsed: true })
       .eq('id', item.id);
     if (updateErr) throw updateErr;
 
-    res.status(200).json({ 
-      message: 'Ticket valid', 
+    attendee.isUsed = true;
+
+    return res.status(200).json({ 
+      message: 'Ticket valid - Checked In Successfully! 🎉', 
       status: 'valid',
-      attendee: { 
-        name: item.order.user.name, 
-        email: item.order.user.email,
-        phone: item.order.user.phone || '',
-        matricNumber: item.order.user.matricNumber || '',
-        type: item.ticket.name, 
-        event: item.ticket.event.title,
-        price: item.ticket.price
-      }
+      attendee,
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    console.error('Error verifying ticket:', error);
     res.status(500).json({ message: 'Error verifying ticket', error: error.message });
   }
 };
@@ -557,7 +585,7 @@ export const getMyTickets = async (req: AuthRequest, res: Response) => {
         location: item.ticket.event.location,
         type: item.ticket.name,
         status: item.isUsed ? 'Used' : 'Valid',
-        qr: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${item.qrCode}&color=4F46E5`,
+        qr: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`https://swyft-ticket.name.ng/verify?code=${item.qrCode}`)}&color=111827`,
         price: item.ticket.price,
         quantity: item.quantity,
         orderId: o.id,

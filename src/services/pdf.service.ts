@@ -13,7 +13,8 @@ export interface TicketPdfData {
 }
 
 export async function generateTicketPdf(data: TicketPdfData): Promise<Buffer> {
-  const qrBuffer = await QRCode.toBuffer(data.verificationId, {
+  const qrTargetUrl = `https://swyft-ticket.name.ng/verify?code=${encodeURIComponent(data.verificationId)}`;
+  const qrBuffer = await QRCode.toBuffer(qrTargetUrl, {
     width: 200,
     margin: 1,
     color: {
