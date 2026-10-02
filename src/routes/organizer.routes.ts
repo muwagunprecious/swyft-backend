@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getStats, getSales, getEvents, getActivity, getDashboard, addContestant, addCategory, updateVotingSettings, getAttendees, verifyTicket, getWallet, requestWithdrawal } from '../controllers/organizer.controller';
+import { saveBankDetails, getBankDetails } from '../controllers/payout.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -14,6 +15,11 @@ router.get('/events', getEvents);
 router.get('/activity', getActivity);
 router.get('/wallet', getWallet);
 router.post('/withdraw', requestWithdrawal);
+router.get('/bank-details', getBankDetails);
+router.post('/bank-details', saveBankDetails);
+router.put('/bank-details', saveBankDetails);
+router.get('/subaccount', getBankDetails);
+router.post('/subaccount', saveBankDetails);
 router.post('/contestants', addContestant);
 router.post('/categories', addCategory);
 router.put('/events/:eventId/voting-settings', updateVotingSettings);
