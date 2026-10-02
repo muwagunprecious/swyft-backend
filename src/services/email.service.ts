@@ -15,7 +15,7 @@ try {
 dotenv.config();
 
 const resendApiKey = process.env.RESEND_API_KEY;
-const resendFrom = process.env.RESEND_FROM || 'Swyft Tickets <onboarding@resend.dev>';
+const resendFrom = process.env.RESEND_FROM || 'Swyft Tickets <info@swyft-ticket.name.ng>';
 const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
 
 const gmailUser = process.env.GMAIL_USER || 'swyftticket@gmail.com';
