@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import QRCode from 'qrcode';
 import dns from 'dns';
+import { Resend } from 'resend';
 import { generateTicketPdf } from './pdf.service';
 
 // Enforce IPv4 first to prevent ISP IPv6 routing timeouts to smtp.gmail.com
@@ -12,6 +13,10 @@ try {
 }
 
 dotenv.config();
+
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendFrom = process.env.RESEND_FROM || 'Swyft Tickets <onboarding@resend.dev>';
+const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
 
 const gmailUser = process.env.GMAIL_USER || 'swyftticket@gmail.com';
 const gmailPass = (process.env.GMAIL_APP_PASSWORD || 'pvnx otjj ynki pugj').replace(/\s+/g, '');
@@ -37,9 +42,39 @@ const transporter = nodemailer.createTransport({
 } as any);
 
 /**
- * Robust SMTP delivery with automatic retry for transient socket drops/tarpitting
+ * High-deliverability email dispatcher:
+ * Prioritizes Resend API (prevents spam folder flagging and cloud SMTP blocking),
+ * and automatically falls back to Nodemailer SMTP with retries.
  */
 const sendWithRetry = async (mailOptions: any, maxRetries = 3): Promise<any> => {
+  if (resendClient) {
+    try {
+      const attachments = mailOptions.attachments?.map((att: any) => ({
+        filename: att.filename,
+        content: Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content),
+      }));
+
+      const toAddress = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
+
+      const { data, error } = await resendClient.emails.send({
+        from: resendFrom,
+        to: toAddress,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+        text: mailOptions.text,
+        attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      });
+
+      if (!error && data?.id) {
+        console.log(`🚀 Email dispatched via Resend to ${toAddress.join(', ')} (ID: ${data.id})`);
+        return { messageId: data.id, resend: true };
+      }
+      console.warn('⚠️ Resend returned error, falling back to SMTP:', error);
+    } catch (err: any) {
+      console.warn(`⚠️ Resend attempt failed: ${err.message}. Falling back to SMTP...`);
+    }
+  }
+
   let lastError: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -478,4 +513,64 @@ export const sendPasswordResetEmail = async ({
     throw error;
   }
 };
+
+/**
+ * 4. WELCOME EMAIL (sent on onboarding or welcome request)
+ */
+export const sendWelcomeEmail = async (email: string, name?: string) => {
+  try {
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8f7fa; padding: 32px 16px; min-height: 100%;">
+        <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;">
+          <div style="background: linear-gradient(135deg, #d1410c 0%, #ea580c 100%); padding: 32px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 0.5px;">SWYFT TICKETS</h1>
+            <p style="color: rgba(255,255,255,0.92); margin: 6px 0 0 0; font-size: 14px;">Next-Gen Ticketing & Event Management</p>
+          </div>
+          <div style="padding: 32px 28px;">
+            <h2 style="font-size: 20px; font-weight: 800; color: #1a202c; margin: 0 0 12px 0;">Welcome to Swyft Tickets! 🎉</h2>
+            <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+              Hello ${name ? `<strong>${name}</strong>` : 'there'}, welcome to <strong>Swyft Tickets</strong>!
+            </p>
+            <p style="font-size: 14px; color: #6f7287; line-height: 1.6; margin: 0 0 24px 0;">
+              Your account and notification system are now set up. You can discover upcoming events, get fast QR ticket passes, and manage organizer sales directly from your dashboard.
+            </p>
+            <div style="background-color: #fff9f6; border: 1.5px solid #ffedd5; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+              <p style="margin: 0; font-size: 13px; color: #c2410c; font-weight: 600;">
+                ✓ Verified Email Notifications Active<br/>
+                ✓ Instant QR Pass Delivery Enabled<br/>
+                ✓ High-Deliverability Inbox Delivery
+              </p>
+            </div>
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="https://swyft-mu.vercel.app" style="background-color: #d1410c; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 9999px; display: inline-block;">
+                Visit Swyft Tickets
+              </a>
+            </div>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0 16px 0;" />
+            <p style="font-size: 11px; color: #9ca3af; text-align: center; margin: 0; line-height: 1.5;">
+              This email was sent to ${email} via Resend.<br/>
+              © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: resendFrom,
+      to: email,
+      subject: 'Welcome to swyft-tickets',
+      text: `Hello ${name || 'there'},\n\nWelcome to Swyft Tickets! Your account and notification system are now active.\n\nVisit: https://swyft-mu.vercel.app\n\n© ${new Date().getFullYear()} SWYFT Technologies`,
+      html: htmlContent,
+    };
+
+    const info = await sendWithRetry(mailOptions);
+    console.log(`✉️ Welcome email sent to ${email} (Message ID: ${info.messageId})`);
+    return info;
+  } catch (error) {
+    console.error('❌ Error sending welcome email:', error);
+    throw error;
+  }
+};
+
 
