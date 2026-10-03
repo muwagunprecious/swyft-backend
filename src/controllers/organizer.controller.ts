@@ -1,6 +1,9 @@
 import { Response } from 'express';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { sendOrderReceiptEmail, sendTicketPassEmail } from '../services/email.service';
 
 // ─── ICON / COLOR MAPS (shared) ─────────────────────────────────────────────
 const iconMap: Record<string, string> = {
@@ -280,7 +283,37 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
       const tickets: any[] = event.Ticket || [];
       let sold = 0, total = 0, revenue = 0;
       tickets.forEach((t: any) => { sold += t.sold || 0; total += t.quantity || 0; revenue += (t.sold || 0) * (t.price || 0); });
-      return { id: event.id, name: event.title, title: event.title, description: event.description, date: event.date, status: event.status || 'DRAFT', bannerImage: event.bannerImage, location: event.location, sold, total, revenue, isVotingEnabled: event.isVotingEnabled, isVotingPaid: event.isVotingPaid, voteCost: event.voteCost };
+      const eventDate = event.date ? new Date(event.date) : null;
+      let isPassed = false;
+      if (eventDate && !isNaN(eventDate.getTime())) {
+        const endOfDay = new Date(eventDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        isPassed = endOfDay.getTime() < Date.now();
+      }
+      return {
+        id: event.id,
+        name: event.title,
+        title: event.title,
+        description: event.description,
+        date: event.date,
+        status: event.status || 'DRAFT',
+        bannerImage: event.bannerImage,
+        location: event.location,
+        sold,
+        total,
+        revenue,
+        isVotingEnabled: event.isVotingEnabled,
+        isVotingPaid: event.isVotingPaid,
+        voteCost: event.voteCost,
+        isPassed,
+        tickets: tickets.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          price: t.price,
+          quantity: t.quantity,
+          sold: t.sold || 0,
+        }))
+      };
     }));
   } catch (error: any) { res.status(500).json({ message: 'Error fetching events', error: error.message }); }
 };
@@ -312,8 +345,6 @@ export const getActivity = async (req: AuthRequest, res: Response) => {
     );
   } catch (error: any) { res.status(500).json({ message: 'Error fetching activity', error: error.message }); }
 };
-
-import crypto from 'crypto';
 
 export const addContestant = async (req: AuthRequest, res: Response) => {
   try {
@@ -736,4 +767,224 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Error submitting withdrawal', error: error.message });
   }
 };
+
+/**
+ * SEND FREE / COMPLIMENTARY TICKET TO ATTENDEE EMAIL
+ * - Validates that the event has not passed
+ * - Validates ticket category
+ * - Generates admission pass with QR code and PDF
+ * - Emails pass directly to recipient via Resend
+ */
+export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizerId = req.user?.userId;
+    if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { email, name, eventId, ticketId, phone } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Recipient email is required' });
+    }
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Attendee name is required' });
+    }
+    if (!eventId) {
+      return res.status(400).json({ message: 'Please select an event' });
+    }
+    if (!ticketId) {
+      return res.status(400).json({ message: 'Please select a ticket category' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    // 1. Fetch Event and Tickets
+    const { data: event, error: eventErr } = await supabase
+      .from('Event')
+      .select('*, Ticket(*)')
+      .eq('id', eventId)
+      .single();
+
+    if (eventErr || !event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // 2. Security: Ensure organizer owns event (or is ADMIN)
+    if (event.organizerId !== organizerId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'You do not have permission to issue tickets for this event' });
+    }
+
+    // 3. CRITICAL: Validate that the event has NOT passed
+    if (event.date) {
+      const eventDate = new Date(event.date);
+      if (!isNaN(eventDate.getTime())) {
+        const eventDay = new Date(eventDate);
+        eventDay.setHours(23, 59, 59, 999);
+        if (eventDay.getTime() < Date.now()) {
+          return res.status(400).json({
+            message: `Cannot send ticket for "${event.title}" because this event has already passed (${eventDate.toLocaleDateString()}). Please select an active upcoming event.`
+          });
+        }
+      }
+    }
+
+    // 4. Validate Ticket Category
+    const ticket = (event.Ticket || []).find((t: any) => t.id === ticketId);
+    if (!ticket) {
+      return res.status(400).json({ message: 'Selected ticket category does not exist for this event' });
+    }
+
+    // 5. Find or create recipient user
+    let recipientUserId: string;
+    const { data: existingUser } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', cleanEmail)
+      .single();
+
+    if (existingUser) {
+      recipientUserId = existingUser.id;
+    } else {
+      recipientUserId = crypto.randomUUID();
+      const randomPassword = await bcrypt.hash(recipientUserId, 10);
+      const { data: createdUser, error: userErr } = await supabase
+        .from('User')
+        .insert({
+          id: recipientUserId,
+          email: cleanEmail,
+          name: cleanName,
+          phone: phone?.trim() || null,
+          password: randomPassword,
+          role: 'STUDENT',
+          isVerified: true,
+          updatedAt: new Date()
+        })
+        .select()
+        .single();
+
+      if (userErr) {
+        console.warn('⚠️ User creation warning:', userErr.message);
+      }
+      recipientUserId = createdUser?.id || recipientUserId;
+    }
+
+    // 6. Generate unique ticket token & IDs
+    const qrCode = `OTX-${crypto.randomUUID()}`;
+    const orderId = crypto.randomUUID();
+    const reference = `FREE-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+
+    // 7. Create Completed Order (Free / ₦0)
+    const { data: order, error: orderErr } = await supabase
+      .from('Order')
+      .insert({
+        id: orderId,
+        userId: recipientUserId,
+        totalPrice: 0,
+        status: 'COMPLETED',
+        updatedAt: new Date()
+      })
+      .select()
+      .single();
+
+    if (orderErr) {
+      return res.status(500).json({ message: 'Failed to create order record', error: orderErr.message });
+    }
+
+    // 8. Create OrderItem
+    const { error: itemErr } = await supabase
+      .from('OrderItem')
+      .insert({
+        id: crypto.randomUUID(),
+        orderId: order.id,
+        ticketId: ticket.id,
+        quantity: 1,
+        qrCode,
+        isUsed: false
+      });
+
+    if (itemErr) {
+      return res.status(500).json({ message: 'Failed to create ticket item', error: itemErr.message });
+    }
+
+    // 9. Create Payment record for tracking
+    await supabase
+      .from('Payment')
+      .insert({
+        id: crypto.randomUUID(),
+        orderId: order.id,
+        reference,
+        amount: 0,
+        status: 'COMPLETED',
+        updatedAt: new Date()
+      });
+
+    // 10. Increment ticket sold count
+    await supabase
+      .from('Ticket')
+      .update({ sold: (ticket.sold || 0) + 1 })
+      .eq('id', ticket.id);
+
+    // 11. Dispatch Emails asynchronously via Resend
+    void (async () => {
+      try {
+        const formattedDate = event.date
+          ? new Date(event.date).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })
+          : 'Event Date TBA';
+
+        // Order Receipt Email
+        await sendOrderReceiptEmail({
+          email: cleanEmail,
+          name: cleanName,
+          eventName: event.title,
+          reference,
+          amount: 0,
+          orderId: order.id,
+          phone: phone?.trim() || undefined,
+          items: [{ name: `${ticket.name} (Complimentary Pass)`, ticketName: ticket.name, quantity: 1, price: 0 }]
+        });
+
+        await new Promise((r) => setTimeout(r, 1500));
+
+        // Official QR Ticket Pass with PDF attachment
+        await sendTicketPassEmail({
+          email: cleanEmail,
+          name: cleanName,
+          eventName: event.title,
+          ticketType: `${ticket.name} (Complimentary Pass)`,
+          venue: event.location || 'Venue TBA',
+          date: formattedDate,
+          verificationId: qrCode,
+          reference,
+          phone: phone?.trim() || undefined,
+        });
+
+        console.log(`🎟️ Free ticket (${ticket.name}) successfully issued and emailed to ${cleanEmail}`);
+      } catch (emailErr: any) {
+        console.error('❌ Failed to email free ticket:', emailErr.message);
+      }
+    })();
+
+    return res.status(200).json({
+      message: `Free ${ticket.name} ticket sent successfully to ${cleanEmail}!`,
+      ticket: {
+        qrCode,
+        reference,
+        attendeeName: cleanName,
+        attendeeEmail: cleanEmail,
+        ticketType: ticket.name,
+        eventName: event.title,
+        date: event.date
+      }
+    });
+  } catch (error: any) {
+    console.error('Error sending free ticket:', error);
+    res.status(500).json({ message: 'Error issuing free ticket', error: error.message });
+  }
+};
+
 

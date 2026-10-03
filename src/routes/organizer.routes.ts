@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getStats, getSales, getEvents, getActivity, getDashboard, addContestant, addCategory, updateVotingSettings, getAttendees, verifyTicket, getWallet, requestWithdrawal } from '../controllers/organizer.controller';
+import { getStats, getSales, getEvents, getActivity, getDashboard, addContestant, addCategory, updateVotingSettings, getAttendees, verifyTicket, getWallet, requestWithdrawal, sendFreeTicket } from '../controllers/organizer.controller';
 import { saveBankDetails, getBankDetails } from '../controllers/payout.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -25,5 +25,6 @@ router.post('/categories', addCategory);
 router.put('/events/:eventId/voting-settings', updateVotingSettings);
 router.get('/attendees', getAttendees);
 router.post('/verify/:id', verifyTicket);
+router.post('/send-free-ticket', sendFreeTicket);
 
 export default router;
