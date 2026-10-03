@@ -37,6 +37,7 @@ model User {
   university    String?   // Student's university/campus
   isVerified    Boolean   @default(false)
   isBanned      Boolean   @default(false)
+  walletBalance Float     @default(0)
   facultyId     String?
   faculty       Faculty?  @relation(fields: [facultyId], references: [id])
   departmentId  String?

@@ -211,7 +211,7 @@ export const releasePayout = async (req: AuthRequest, res: Response) => {
 
     const { data: payout, error: fetchErr } = await supabase
       .from('Payout')
-      .select('id, status')
+      .select('id, userId, amount, status')
       .eq('id', payoutId)
       .single();
 
@@ -232,8 +232,27 @@ export const releasePayout = async (req: AuthRequest, res: Response) => {
 
     if (updateErr) throw updateErr;
 
+    // Immediately deduct amount from organizer's wallet balance in User table
+    if (payout.userId && payout.amount) {
+      const { data: user } = await supabase
+        .from('User')
+        .select('walletBalance')
+        .eq('id', payout.userId)
+        .single();
+
+      const currentBalance = typeof user?.walletBalance === 'number' ? user.walletBalance : 0;
+      const newBalance = Math.max(0, currentBalance - (payout.amount || 0));
+
+      await supabase
+        .from('User')
+        .update({ walletBalance: newBalance })
+        .eq('id', payout.userId);
+
+      console.log(`💸 Payout ₦${payout.amount} released for organizer ${payout.userId}. Wallet balance updated: ₦${currentBalance} -> ₦${newBalance}`);
+    }
+
     res.status(200).json({
-      message: 'Payout successfully released and approved.',
+      message: 'Payout successfully released and approved. The amount has been withdrawn from the organizer wallet.',
       payout: updatedPayout,
     });
   } catch (error: any) {
@@ -250,7 +269,7 @@ export const rejectPayout = async (req: AuthRequest, res: Response) => {
 
     const { data: payout, error: fetchErr } = await supabase
       .from('Payout')
-      .select('id, status')
+      .select('id, userId, amount, status')
       .eq('id', payoutId)
       .single();
 

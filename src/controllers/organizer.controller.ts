@@ -48,8 +48,14 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     const ticketIds = events.flatMap((e: any) => e.Ticket?.map((t: any) => t.id) || []);
 
     if (eventIds.length === 0) {
+      const { data: userRecord } = await supabase
+        .from('User')
+        .select('walletBalance')
+        .eq('id', organizerId)
+        .single();
+
       return res.status(200).json({ 
-        stats: { revenue: 0, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
+        stats: { revenue: 0, walletBalance: userRecord?.walletBalance || 0, withdrawnAmount: 0, pendingWithdrawals: 0, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
         sales: [], 
         activity: [] 
       });
@@ -63,6 +69,29 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         revenue += (t.sold || 0) * (t.price || 0);
       });
     });
+
+    // Fetch payouts to calculate net wallet balance
+    const { data: payouts } = await supabase
+      .from('Payout')
+      .select('amount, status')
+      .eq('userId', organizerId);
+
+    let withdrawnAmount = 0;
+    let pendingWithdrawals = 0;
+    (payouts || []).forEach((p: any) => {
+      if (p.status === 'COMPLETED') withdrawnAmount += p.amount || 0;
+      else if (p.status === 'PENDING') pendingWithdrawals += p.amount || 0;
+    });
+
+    const { data: userRecord } = await supabase
+      .from('User')
+      .select('walletBalance')
+      .eq('id', organizerId)
+      .single();
+
+    const walletBalance = typeof userRecord?.walletBalance === 'number'
+      ? userRecord.walletBalance
+      : Math.max(0, revenue - withdrawnAmount - pendingWithdrawals);
 
     // Fetch VoteCategories to get categoryIds
     const { data: categories } = await supabase
@@ -172,7 +201,15 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
 
     // ── Single response ──────────────────────────────────────────────────────
     res.status(200).json({
-      stats: { revenue, ticketsSold, totalVotes, activeEvents: events.length },
+      stats: {
+        revenue,
+        walletBalance,
+        withdrawnAmount,
+        pendingWithdrawals,
+        ticketsSold,
+        totalVotes,
+        activeEvents: events.length,
+      },
       sales,
       activity
     });
@@ -195,7 +232,38 @@ export const getStats = async (req: AuthRequest, res: Response) => {
       (event.Ticket || []).forEach((t: any) => { ticketsSold += t.sold || 0; revenue += (t.sold || 0) * (t.price || 0); });
       (event.VoteCategory || []).forEach((vc: any) => { totalVotes += (vc.Vote || []).length; });
     });
-    res.status(200).json({ revenue, ticketsSold, totalVotes, activeEvents: (events || []).length });
+
+    const { data: payouts } = await supabase
+      .from('Payout')
+      .select('amount, status')
+      .eq('userId', organizerId);
+
+    let withdrawnAmount = 0;
+    let pendingWithdrawals = 0;
+    (payouts || []).forEach((p: any) => {
+      if (p.status === 'COMPLETED') withdrawnAmount += p.amount || 0;
+      else if (p.status === 'PENDING') pendingWithdrawals += p.amount || 0;
+    });
+
+    const { data: userRecord } = await supabase
+      .from('User')
+      .select('walletBalance')
+      .eq('id', organizerId)
+      .single();
+
+    const walletBalance = typeof userRecord?.walletBalance === 'number'
+      ? userRecord.walletBalance
+      : Math.max(0, revenue - withdrawnAmount - pendingWithdrawals);
+
+    res.status(200).json({
+      revenue,
+      walletBalance,
+      withdrawnAmount,
+      pendingWithdrawals,
+      ticketsSold,
+      totalVotes,
+      activeEvents: (events || []).length,
+    });
   } catch (error: any) { res.status(500).json({ message: 'Error fetching stats', error: error.message }); }
 };
 
@@ -625,6 +693,28 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     });
 
     const availableBalance = Math.max(0, totalRevenue - withdrawnAmount - pendingWithdrawals);
+
+    // Keep User.walletBalance in sync with availableBalance in database
+    await supabase.from('User').update({ walletBalance: availableBalance }).eq('id', organizerId);
+
+    // Add withdrawals as debit ledger transactions
+    (payouts || []).forEach((p: any) => {
+      transactions.push({
+        id: p.id,
+        orderId: p.reference || `WD-${p.id.slice(0, 8)}`,
+        event: 'Settlement Withdrawal',
+        ticketType: `${p.bankName || 'Bank'} (${p.accountNumber || '—'})`,
+        quantity: 1,
+        amount: -Math.abs(p.amount || 0),
+        customer: p.accountName || user?.name || 'Withdrawal Transfer',
+        date: p.updatedAt || p.createdAt,
+        status: p.status === 'COMPLETED' ? 'Completed' : p.status === 'PENDING' ? 'Pending' : 'Rejected',
+        type: 'debit',
+      });
+    });
+
+    // Sort transactions with newest first
+    transactions.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
     res.status(200).json({
       totalRevenue,
