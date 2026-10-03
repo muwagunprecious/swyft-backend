@@ -438,13 +438,17 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     
     const { data: item, error } = await supabase
       .from('OrderItem')
-      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*))')
+      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*), payment:Payment(*))')
       .eq('qrCode', qrCode)
       .single();
 
     if (error || !item) {
       return res.status(404).json({ message: 'Invalid ticket or ticket not found', status: 'invalid' });
     }
+
+    const paymentRef = Array.isArray(item.order?.payment)
+      ? item.order?.payment[0]?.reference
+      : item.order?.payment?.reference;
 
     const attendee = {
       id: item.id,
@@ -461,7 +465,7 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
       venue: item.ticket?.event?.venue || item.ticket?.event?.location || 'Venue TBA',
       price: item.ticket?.price ?? 0,
       quantity: item.quantity || 1,
-      reference: item.order?.reference || item.qrCode,
+      reference: paymentRef || item.order?.reference || item.qrCode,
       qrCode: item.qrCode,
       isUsed: Boolean(item.isUsed),
     };
