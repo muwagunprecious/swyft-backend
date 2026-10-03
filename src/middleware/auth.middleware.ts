@@ -24,12 +24,15 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string; role: string };
     
     const { supabase } = await import('../config/supabase');
-    const { data: user } = await supabase.from('User').select('isBanned').eq('id', decoded.userId).single();
+    const { data: user } = await supabase.from('User').select('isBanned, role').eq('id', decoded.userId).single();
     if (user && user.isBanned) {
       return res.status(403).json({ message: 'Access denied: Your account has been suspended.' });
     }
 
-    req.user = decoded;
+    req.user = {
+      userId: decoded.userId,
+      role: user?.role || decoded.role,
+    };
     next();
   } catch (error) {
     res.status(401).json({ message: 'Token is not valid' });
@@ -52,12 +55,15 @@ export const optionalAuthenticate = async (req: AuthRequest, res: Response, next
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string; role: string };
     
     const { supabase } = await import('../config/supabase');
-    const { data: user } = await supabase.from('User').select('isBanned').eq('id', decoded.userId).single();
+    const { data: user } = await supabase.from('User').select('isBanned, role').eq('id', decoded.userId).single();
     if (user && user.isBanned) {
       return res.status(403).json({ message: 'Access denied: Your account has been suspended.' });
     }
 
-    req.user = decoded;
+    req.user = {
+      userId: decoded.userId,
+      role: user?.role || decoded.role,
+    };
     next();
   } catch (error) {
     // If token is invalid, we can just proceed as a guest, or return 401. 
