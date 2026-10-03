@@ -36,6 +36,7 @@ model User {
   role          Role      @default(STUDENT)
   university    String?   // Student's university/campus
   isVerified    Boolean   @default(false)
+  isBanned      Boolean   @default(false)
   facultyId     String?
   faculty       Faculty?  @relation(fields: [facultyId], references: [id])
   departmentId  String?
@@ -89,6 +90,7 @@ model Event {
   voteCost           Float     @default(0)
   showLiveRankings   Boolean   @default(true)
   allowMultipleVotes Boolean   @default(true)
+  isSuspended        Boolean   @default(false)
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
