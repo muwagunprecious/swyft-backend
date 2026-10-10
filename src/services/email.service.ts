@@ -144,71 +144,67 @@ export const sendOrderReceiptEmail = async ({
         'X-Auto-Response-Suppress': 'OOF, AutoReply',
       },
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 14px rgba(40,44,53,0.08);">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
           
           <!-- Top Brand Header -->
-          <div style="background-color: #d1410c; padding: 28px 24px; text-align: center; color: #ffffff;">
-            <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: #ffffff;">SWYFT</h1>
-            <p style="margin: 6px 0 0 0; font-size: 13px; color: #fff2ed; font-weight: 500;">Campus Events & Ticketing Marketplace</p>
+          <div style="background-color: #0a0a0a; padding: 32px 24px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 28px; font-weight: 300; letter-spacing: 0.05em; color: #fafafa;">SWYFT</h1>
+            <p style="margin: 6px 0 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em;">Official Transaction Receipt</p>
           </div>
           
           <!-- Main Content -->
           <div style="padding: 32px 24px;">
-            <div style="background-color: #fff9f6; border-left: 4px solid #d1410c; padding: 16px 20px; border-radius: 6px; margin-bottom: 24px;">
-              <h2 style="margin: 0 0 6px 0; color: #39364f; font-size: 20px; font-weight: 700;">Order Confirmed!</h2>
-              <p style="margin: 0; color: #6f7287; font-size: 14px; line-height: 1.5;">
-                You're all set. Your ticket passes and transaction receipt have been generated below.
+            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 18px 20px; border-radius: 12px; margin-bottom: 24px;">
+              <h2 style="margin: 0 0 6px 0; color: #111827; font-size: 18px; font-weight: 600;">Order Confirmed</h2>
+              <p style="margin: 0; color: #6b7280; font-size: 13px; line-height: 1.5;">
+                Your order is confirmed. Your admission ticket passes and transaction invoice are detailed below.
               </p>
             </div>
 
             <!-- Receipt Breakdown -->
-            <h3 style="margin: 0 0 12px 0; color: #39364f; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+            <h3 style="margin: 0 0 12px 0; color: #374151; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">
               Transaction Summary
             </h3>
             
-            <div style="background-color: #f8f7fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #39364f;">
+            <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #374151;">
                 <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Order Date</td>
-                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${purchaseDate}</td>
+                  <td style="padding: 6px 0; color: #6b7280;">Order Date</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #111827;">${purchaseDate}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Billed To</td>
-                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${name}</td>
+                  <td style="padding: 6px 0; color: #6b7280;">Billed To</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #111827;">${name}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Email Address</td>
-                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${email}</td>
+                  <td style="padding: 6px 0; color: #6b7280;">Email Address</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #111827;">${email}</td>
                 </tr>
                 ${phone ? `
                 <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Phone</td>
-                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">${phone}</td>
+                  <td style="padding: 6px 0; color: #6b7280;">Phone</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #111827;">${phone}</td>
                 </tr>
                 ` : ''}
                 <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Payment Channel</td>
-                  <td style="padding: 6px 0; font-weight: 600; text-align: right;">Paystack (Verified)</td>
+                  <td style="padding: 6px 0; color: #6b7280;">Payment Method</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #10b981;">Paystack (Verified)</td>
                 </tr>
                 <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Transaction Ref</td>
-                  <td style="padding: 6px 0; font-family: monospace; font-weight: 700; text-align: right; color: #39364f;">${reference}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #6f7287;">Order ID</td>
-                  <td style="padding: 6px 0; font-family: monospace; font-size: 11px; text-align: right; color: #6f7287;">${orderId}</td>
+                  <td style="padding: 6px 0; color: #6b7280;">Reference</td>
+                  <td style="padding: 6px 0; font-family: monospace; font-weight: 700; text-align: right; color: #111827;">${reference}</td>
                 </tr>
               </table>
             </div>
 
             <!-- Items Table -->
-            <h3 style="margin: 0 0 12px 0; color: #39364f; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+            <h3 style="margin: 0 0 12px 0; color: #374151; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">
               Order Details
             </h3>
 
-            <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 24px;">
+            <div style="border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
               <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                <thead style="background-color: #f8f7fa; border-bottom: 1px solid #e5e7eb; color: #6f7287;">
+                <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb; color: #6b7280;">
                   <tr>
                     <th style="padding: 10px 14px; text-align: left; font-weight: 600;">Event & Tier</th>
                     <th style="padding: 10px 14px; text-align: center; font-weight: 600;">Qty</th>
@@ -217,38 +213,38 @@ export const sendOrderReceiptEmail = async ({
                 </thead>
                 <tbody>
                   ${items.length > 0 ? items.map(item => `
-                    <tr style="border-bottom: 1px solid #f0f0f0;">
-                      <td style="padding: 12px 14px; font-weight: 600; color: #39364f;">
+                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                      <td style="padding: 12px 14px; font-weight: 600; color: #111827;">
                         ${eventName}
-                        <div style="font-size: 12px; font-weight: 500; color: #d1410c;">${item.name || item.ticketName || 'General Admission'}</div>
+                        <div style="font-size: 12px; font-weight: 400; color: #6b7280;">${item.name || item.ticketName || 'General Admission'}</div>
                       </td>
-                      <td style="padding: 12px 14px; text-align: center; color: #39364f;">${item.quantity}</td>
-                      <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #39364f;">₦${(item.price * item.quantity).toLocaleString()}</td>
+                      <td style="padding: 12px 14px; text-align: center; color: #374151;">${item.quantity}</td>
+                      <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #111827;">₦${(item.price * item.quantity).toLocaleString()}</td>
                     </tr>
                   `).join('') : `
                     <tr>
-                      <td style="padding: 12px 14px; font-weight: 600; color: #39364f;">${eventName}</td>
-                      <td style="padding: 12px 14px; text-align: center; color: #39364f;">1</td>
-                      <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #39364f;">${formattedAmount}</td>
+                      <td style="padding: 12px 14px; font-weight: 600; color: #111827;">${eventName}</td>
+                      <td style="padding: 12px 14px; text-align: center; color: #374151;">1</td>
+                      <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #111827;">${formattedAmount}</td>
                     </tr>
                   `}
-                  <tr style="background-color: #f8f7fa;">
-                    <td colspan="2" style="padding: 12px 14px; font-weight: 700; color: #39364f; font-size: 14px;">Total Paid</td>
-                    <td style="padding: 12px 14px; text-align: right; font-weight: 800; color: #d1410c; font-size: 16px;">${formattedAmount}</td>
+                  <tr style="background-color: #f9fafb;">
+                    <td colspan="2" style="padding: 12px 14px; font-weight: 600; color: #111827; font-size: 14px;">Total Paid</td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #111827; font-size: 16px;">${formattedAmount}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <!-- Next Steps Callout -->
-            <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-              <p style="margin: 0; color: #0369a1; font-size: 13px; line-height: 1.5;">
-                🎫 <strong>Your Digital Ticket:</strong> Your official scannable entry pass and downloadable PDF have also been dispatched to this email address in a separate message.
+            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+              <p style="margin: 0; color: #166534; font-size: 13px; line-height: 1.5;">
+                🎫 <strong>Digital Pass Dispatched:</strong> Your scannable gate pass and downloadable PDF have also been sent to your email.
               </p>
             </div>
 
             <!-- Footer -->
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+            <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
               Need help with this order? Contact event support at ${gmailUser}.<br>
               © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
             </p>
@@ -301,7 +297,7 @@ export const sendTicketPassEmail = async ({
       width: 250,
       margin: 1,
       color: {
-        dark: '#111827',
+        dark: '#0a0a0a',
         light: '#ffffff',
       },
     });
@@ -330,69 +326,69 @@ export const sendTicketPassEmail = async ({
         'X-Auto-Response-Suppress': 'OOF, AutoReply',
       },
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 14px rgba(40,44,53,0.08);">
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
           
           <!-- Header -->
-          <div style="background-color: #d1410c; padding: 28px 24px; text-align: center; color: #ffffff;">
-            <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: #ffffff;">SWYFT</h1>
-            <p style="margin: 6px 0 0 0; font-size: 13px; color: #fff2ed; font-weight: 500;">Official Admission Pass & Ticket</p>
+          <div style="background-color: #0a0a0a; padding: 32px 24px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 28px; font-weight: 300; letter-spacing: 0.05em; color: #fafafa;">SWYFT</h1>
+            <p style="margin: 6px 0 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em;">Official Admission Pass</p>
           </div>
           
           <!-- Content -->
           <div style="padding: 32px 24px;">
-            <h2 style="margin-top: 0; color: #39364f; font-size: 20px; font-weight: 700;">Hi ${name},</h2>
-            <p style="color: #6f7287; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+            <h2 style="margin-top: 0; color: #111827; font-size: 20px; font-weight: 600;">Hi ${name},</h2>
+            <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
               Here is your official admission pass for <strong>${eventName}</strong>. A scannable PDF is attached to this email for your convenience.
             </p>
             
             <!-- Event Card Container -->
-            <div style="background-color: #ffffff; border: 1.5px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+            <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; margin-bottom: 28px;">
               
               <!-- Ticket Upper Banner -->
-              <div style="background-color: #f8f7fa; padding: 20px; border-bottom: 1px dashed #dddae3;">
-                <p style="margin: 0 0 4px 0; color: #d1410c; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+              <div style="background-color: #f9fafb; padding: 20px; border-bottom: 1px dashed #e5e7eb;">
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">
                   ${date.toUpperCase()}
                 </p>
-                <h3 style="margin: 0 0 8px 0; color: #39364f; font-size: 18px; font-weight: 700; line-height: 1.3;">
+                <h3 style="margin: 0 0 8px 0; color: #111827; font-size: 18px; font-weight: 700; line-height: 1.3;">
                   ${eventName}
                 </h3>
-                <p style="margin: 0; color: #6f7287; font-size: 13px; font-weight: 500;">
+                <p style="margin: 0; color: #6b7280; font-size: 13px;">
                   📍 ${venue} ${university ? `• ${university}` : ''}
                 </p>
               </div>
 
               <!-- Ticket Info Grid -->
-              <div style="padding: 20px; border-bottom: 1px dashed #dddae3;">
+              <div style="padding: 20px; border-bottom: 1px dashed #e5e7eb;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                   <tr>
-                    <td style="padding: 4px 0; color: #6f7287; font-weight: 500;">Attendee:</td>
-                    <td style="padding: 4px 0; font-weight: 700; color: #39364f; text-align: right;">${name}</td>
+                    <td style="padding: 5px 0; color: #6b7280;">Attendee:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #111827; text-align: right;">${name}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; color: #6f7287; font-weight: 500;">Ticket Tier:</td>
-                    <td style="padding: 4px 0; font-weight: 700; color: #d1410c; text-align: right;">${ticketType}</td>
+                    <td style="padding: 5px 0; color: #6b7280;">Ticket Tier:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #111827; text-align: right;">${ticketType}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; color: #6f7287; font-weight: 500;">Booking Reference:</td>
-                    <td style="padding: 4px 0; font-family: monospace; font-weight: 600; color: #39364f; text-align: right;">${reference}</td>
+                    <td style="padding: 5px 0; color: #6b7280;">Booking Reference:</td>
+                    <td style="padding: 5px 0; font-family: monospace; font-weight: 600; color: #111827; text-align: right;">${reference}</td>
                   </tr>
                 </table>
               </div>
 
               <!-- QR Code Check-in Area -->
               <div style="padding: 24px; text-align: center; background-color: #ffffff;">
-                <div style="display: inline-block; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background-color: #ffffff; margin-bottom: 14px;">
+                <div style="display: inline-block; padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; margin-bottom: 14px;">
                   <img src="data:image/png;base64,${qrBuffer.toString('base64')}" alt="Admission QR Code" width="180" height="180" style="display: block; margin: 0 auto; border: 0;" />
                 </div>
                 
-                <p style="margin: 0 0 4px 0; font-size: 11px; color: #6f7287; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                <p style="margin: 0 0 4px 0; font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
                   Verification Token
                 </p>
-                <code style="font-family: monospace; font-size: 16px; color: #d1410c; font-weight: 800; background-color: #fff9f6; padding: 6px 14px; border-radius: 6px; border: 1px solid #fecaca; display: inline-block; word-break: break-all;">
+                <code style="font-family: monospace; font-size: 16px; color: #111827; font-weight: 700; background-color: #f3f4f6; padding: 6px 14px; border-radius: 8px; border: 1px solid #e5e7eb; display: inline-block; word-break: break-all;">
                   ${verificationId}
                 </code>
                 
-                <p style="margin: 16px 0 0 0; font-size: 13px; color: #6f7287; line-height: 1.4;">
+                <p style="margin: 16px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.4;">
                   Present this QR code or provide the Verification Token to event staff at the gate for fast entry check-in.
                 </p>
               </div>
@@ -400,19 +396,19 @@ export const sendTicketPassEmail = async ({
             </div>
 
             <!-- PDF Attachment Callout -->
-            <div style="background-color: #fff9f6; border: 1.5px solid #fed7aa; border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 12px;">
-              <span style="font-size: 24px;">📎</span>
+            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 20px;">📎</span>
               <div>
-                <strong style="color: #39364f; font-size: 13px; display: block;">Downloadable Ticket PDF Attached</strong>
-                <span style="color: #6f7287; font-size: 12px;">
-                  A scannable, print-ready PDF copy (<code>ticket-${verificationId}.pdf</code>) is attached to this email for offline scanning.
+                <strong style="color: #111827; font-size: 13px; display: block;">Print-Ready Ticket PDF Attached</strong>
+                <span style="color: #6b7280; font-size: 12px;">
+                  A scannable PDF (<code>ticket-${verificationId}.pdf</code>) is attached to this email.
                 </span>
               </div>
             </div>
 
             <!-- Footer -->
-            <p style="font-size: 11px; color: #888888; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 16px; line-height: 1.5;">
-              This is a transactional confirmation from Swyft Ticketing for your purchase.<br>
+            <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 16px; line-height: 1.5;">
+              This is a transactional confirmation from Swyft for your purchase.<br>
               Questions? Contact support at ${gmailUser}.<br>
               © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
             </p>

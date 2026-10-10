@@ -219,7 +219,17 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ message: `Not enough tickets available for ${ticket.name} (some are currently held in other carts)` });
       }
 
-      totalPrice += ticket.price * item.quantity;
+      let effectivePrice = ticket.price;
+      if (
+        ticket.discountPrice !== null &&
+        ticket.discountPrice !== undefined &&
+        ticket.discountEndsAt &&
+        new Date(ticket.discountEndsAt) > new Date()
+      ) {
+        effectivePrice = ticket.discountPrice;
+      }
+
+      totalPrice += effectivePrice * item.quantity;
       orderItemsData.push({
         ticketId: item.ticketId,
         quantity: item.quantity,

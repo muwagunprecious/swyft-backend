@@ -98,14 +98,16 @@ model Event {
 }
 
 model Ticket {
-  id          String   @id @default(uuid())
-  name        String   // Regular, VIP, etc.
-  price       Float
-  quantity    Int
-  sold        Int      @default(0)
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id])
-  orderItems  OrderItem[]
+  id              String      @id @default(uuid())
+  name            String      // Regular, VIP, etc.
+  price           Float
+  discountPrice   Float?
+  discountEndsAt  DateTime?
+  quantity        Int
+  sold            Int         @default(0)
+  eventId         String
+  event           Event       @relation(fields: [eventId], references: [id])
+  orderItems      OrderItem[]
 }
 
 model Order {

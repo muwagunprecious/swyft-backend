@@ -254,14 +254,32 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
     // 2. Create Tickets if any
     if (tickets && tickets.length > 0) {
-      const ticketsWithIds = tickets.map((t: any) => ({
-        id: crypto.randomUUID(),
-        name: t.name,
-        price: parseFloat(t.price),
-        quantity: parseInt(t.quantity),
-        sold: 0,
-        eventId: event.id,
-      }));
+      const ticketsWithIds = tickets.map((t: any) => {
+        let discountEndsAt: string | null = null;
+        const discountPriceVal = t.discountPrice !== undefined && t.discountPrice !== null && t.discountPrice !== ''
+          ? parseFloat(t.discountPrice)
+          : null;
+
+        if (discountPriceVal !== null && !isNaN(discountPriceVal)) {
+          if (t.discountDays && parseInt(t.discountDays) > 0) {
+            const ends = new Date(Date.now() + parseInt(t.discountDays) * 24 * 60 * 60 * 1000);
+            discountEndsAt = ends.toISOString();
+          } else if (t.discountEndsAt) {
+            discountEndsAt = new Date(t.discountEndsAt).toISOString();
+          }
+        }
+
+        return {
+          id: crypto.randomUUID(),
+          name: t.name,
+          price: parseFloat(t.price),
+          discountPrice: (discountPriceVal !== null && !isNaN(discountPriceVal)) ? discountPriceVal : null,
+          discountEndsAt,
+          quantity: parseInt(t.quantity),
+          sold: 0,
+          eventId: event.id,
+        };
+      });
       const { error: ticketsError } = await supabase
         .from('Ticket')
         .insert(ticketsWithIds);

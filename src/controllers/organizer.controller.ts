@@ -1077,4 +1077,78 @@ export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const updateTicketDiscount = async (req: AuthRequest, res: Response) => {
+  try {
+    const { ticketId } = req.params;
+    const { discountPrice, discountDays } = req.body;
+    const userId = req.user?.userId;
+
+    if (!ticketId) {
+      return res.status(400).json({ message: 'Ticket ID is required' });
+    }
+
+    // Verify ownership of the event ticket
+    const { data: ticket, error: ticketErr } = await supabase
+      .from('Ticket')
+      .select('id, name, price, event:Event(id, title, organizerId)')
+      .eq('id', ticketId)
+      .single();
+
+    if (ticketErr || !ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const eventOrganizerId = (ticket.event as any)?.organizerId;
+    if (eventOrganizerId !== userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'You do not have permission to manage this ticket' });
+    }
+
+    let discountPriceVal: number | null = null;
+    let discountEndsAt: string | null = null;
+
+    if (discountPrice !== undefined && discountPrice !== null && discountPrice !== '') {
+      const parsedPrice = parseFloat(discountPrice);
+      if (isNaN(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({ message: 'Invalid discount price' });
+      }
+      if (parsedPrice >= ticket.price) {
+        return res.status(400).json({ message: `Discount price must be less than regular price (₦${ticket.price.toLocaleString()})` });
+      }
+      discountPriceVal = parsedPrice;
+
+      const days = parseInt(discountDays);
+      if (isNaN(days) || days <= 0) {
+        return res.status(400).json({ message: 'Please specify how many days the discount should remain valid' });
+      }
+      discountEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const { data: updatedTicket, error: updateErr } = await supabase
+      .from('Ticket')
+      .update({
+        discountPrice: discountPriceVal,
+        discountEndsAt: discountEndsAt
+      })
+      .eq('id', ticketId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      console.error('Error updating ticket discount:', updateErr);
+      return res.status(500).json({ message: 'Failed to update ticket discount', error: updateErr.message });
+    }
+
+    return res.status(200).json({
+      message: discountPriceVal !== null
+        ? `Discount set to ₦${discountPriceVal.toLocaleString()} for ${discountDays} day(s)`
+        : 'Discount removed successfully',
+      ticket: updatedTicket
+    });
+  } catch (error: any) {
+    console.error('updateTicketDiscount error:', error);
+    return res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+
 
