@@ -12,6 +12,8 @@ import {
   rejectPayout,
   getTickets,
   getUserAuditTrail,
+  updateOrganizerBankDetails,
+  updateOrganizerWallet,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -22,6 +24,8 @@ router.use(authenticate, authorize(['ADMIN']));
 router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.get('/organizers', getOrganizersDirectory);
+router.put('/organizers/:userId/bank-details', updateOrganizerBankDetails);
+router.put('/organizers/:userId/wallet', updateOrganizerWallet);
 router.post('/users/:userId/ban', toggleBan);
 router.get('/events', getEvents);
 router.post('/events/:eventId/toggle-status', toggleEventStatus);

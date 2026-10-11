@@ -13,7 +13,10 @@ export const saveBankDetails = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Bank name and account number are required' });
     }
 
-    const cleanAccount = String(accountNumber).trim().replace(/\D/g, '');
+    let cleanAccount = String(accountNumber).trim().replace(/\D/g, '');
+    if (cleanAccount.length === 11 && cleanAccount.startsWith('0')) {
+      cleanAccount = cleanAccount.substring(1);
+    }
     if (cleanAccount.length !== 10) {
       return res.status(400).json({ message: 'Please enter a valid 10-digit account number' });
     }

@@ -79,63 +79,234 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// 2b. Get Organizers & Wallets Directory
+// 2b. Get Organizers & Wallets Directory (Dynamic Live Wallet Calculation & Bank Account Sync)
 export const getOrganizersDirectory = async (req: AuthRequest, res: Response) => {
   try {
-    // Fetch users along with their events and payouts
-    const { data: users, error } = await supabase
+    // 1. Fetch all users
+    const { data: users, error: usersErr } = await supabase
       .from('User')
-      .select('id, name, email, role, university, phone, isVerified, isBanned, walletBalance, bankName, accountNumber, bankCode, subaccountCode, createdAt, events:Event(id, title), payouts:Payout(id, amount, status, bankName, accountNumber, createdAt)')
+      .select('id, name, email, role, university, phone, isVerified, isBanned, walletBalance, bankName, accountNumber, bankCode, subaccountCode, createdAt')
       .order('createdAt', { ascending: false });
 
-    if (error) throw error;
+    if (usersErr) throw usersErr;
 
-    // Filter for users who are organizers, have created events, have a bank account, or have a wallet balance
-    const organizers = (users || []).filter(
-      (u: any) =>
-        u.role === 'ORGANIZER' ||
-        (u.events && u.events.length > 0) ||
-        u.accountNumber ||
-        (typeof u.walletBalance === 'number' && u.walletBalance > 0)
-    );
+    // 2. Fetch all events, tickets, completed order items, and payouts in parallel
+    const [eventsRes, ticketsRes, completedItemsRes, payoutsRes] = await Promise.all([
+      supabase.from('Event').select('id, title, organizerId'),
+      supabase.from('Ticket').select('id, name, price, sold, eventId'),
+      supabase.from('OrderItem').select('id, quantity, ticketId, ticket:Ticket(id, price, eventId), order:Order!inner(status)').eq('order.status', 'COMPLETED'),
+      supabase.from('Payout').select('*').order('createdAt', { ascending: false }),
+    ]);
 
-    const formatted = organizers.map((u: any) => {
-      const completedPayouts = (u.payouts || []).filter((p: any) => p.status === 'COMPLETED');
-      const pendingPayouts = (u.payouts || []).filter((p: any) => p.status === 'PENDING');
+    const events = eventsRes.data || [];
+    const tickets = ticketsRes.data || [];
+    const completedItems = completedItemsRes.data || [];
+    const payouts = payoutsRes.data || [];
+
+    // Map events by organizer
+    const eventsByOrg: Record<string, any[]> = {};
+    for (const ev of events) {
+      if (!eventsByOrg[ev.organizerId]) eventsByOrg[ev.organizerId] = [];
+      eventsByOrg[ev.organizerId].push(ev);
+    }
+
+    // Map ticket sold revenue by organizer (sold * price)
+    const ticketRevByOrg: Record<string, number> = {};
+    for (const t of tickets) {
+      const ev = events.find((e: any) => e.id === t.eventId);
+      if (ev && ev.organizerId) {
+        ticketRevByOrg[ev.organizerId] = (ticketRevByOrg[ev.organizerId] || 0) + ((t.sold || 0) * (t.price || 0));
+      }
+    }
+
+    // Map completed order item revenue by organizer (quantity * ticket.price)
+    const itemRevByOrg: Record<string, number> = {};
+    for (const item of completedItems) {
+      const t = item.ticket as any;
+      if (t && t.eventId) {
+        const ev = events.find((e: any) => e.id === t.eventId);
+        if (ev && ev.organizerId) {
+          const itemTotal = (t.price || 0) * (item.quantity || 1);
+          itemRevByOrg[ev.organizerId] = (itemRevByOrg[ev.organizerId] || 0) + itemTotal;
+        }
+      }
+    }
+
+    // Map payouts by user
+    const payoutsByUser: Record<string, any[]> = {};
+    for (const p of payouts) {
+      if (!payoutsByUser[p.userId]) payoutsByUser[p.userId] = [];
+      payoutsByUser[p.userId].push(p);
+    }
+
+    const organizersList: any[] = [];
+    const syncUpdates: Promise<any>[] = [];
+
+    for (const u of (users || [])) {
+      const userEvents = eventsByOrg[u.id] || [];
+      const userPayouts = payoutsByUser[u.id] || [];
+
+      // Ground truth revenue: take max of completed OrderItems revenue and ticket.sold revenue
+      const tRev = ticketRevByOrg[u.id] || 0;
+      const iRev = itemRevByOrg[u.id] || 0;
+      const totalRevenue = Math.max(tRev, iRev);
+
+      const completedPayouts = userPayouts.filter((p: any) => p.status === 'COMPLETED');
+      const pendingPayouts = userPayouts.filter((p: any) => p.status === 'PENDING');
 
       const totalWithdrawn = completedPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
       const pendingWithdrawals = pendingPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-      // Preferred bank account: user's saved bank settings, or last payout bank info
-      const latestPayout = (u.payouts || [])[0];
-      const bankName = u.bankName || latestPayout?.bankName || 'Not Provided';
-      const accountNumber = u.accountNumber || latestPayout?.accountNumber || 'Not Provided';
+      // Real live available balance: total revenue minus withdrawn and pending
+      const realCalculatedBalance = Math.max(0, totalRevenue - totalWithdrawn - pendingWithdrawals);
+      const currentStoredBalance = typeof u.walletBalance === 'number' ? u.walletBalance : 0;
+      const effectiveWalletBalance = Math.max(currentStoredBalance, realCalculatedBalance);
 
-      return {
-        id: u.id,
-        name: u.name || 'Unnamed Organizer',
-        email: u.email,
-        phone: u.phone || 'N/A',
-        role: u.role,
-        university: u.university || 'N/A',
-        isBanned: u.isBanned || false,
-        createdAt: u.createdAt,
-        walletBalance: typeof u.walletBalance === 'number' ? u.walletBalance : 0,
-        bankName,
-        accountNumber,
-        bankCode: u.bankCode || '',
-        subaccountCode: u.subaccountCode || '',
-        totalWithdrawn,
-        pendingWithdrawals,
-        eventsCount: (u.events || []).length,
-        events: u.events || [],
-        recentPayouts: (u.payouts || []).slice(0, 3),
-      };
-    });
+      // Bank account resolution:
+      // Priority 1: User's saved bank account in User table
+      let bankName = (u.bankName || '').trim();
+      let accountNumber = (u.accountNumber || '').trim();
 
-    res.status(200).json(formatted);
+      // Priority 2: Fallback to any past Payout request submitted by the organizer
+      if (!accountNumber || accountNumber === 'Not Provided' || accountNumber === 'Not Set' || accountNumber === '—') {
+        const payoutWithAccount = userPayouts.find((p: any) => p.accountNumber && String(p.accountNumber).trim() !== '');
+        if (payoutWithAccount) {
+          accountNumber = String(payoutWithAccount.accountNumber).trim();
+          if (!bankName || bankName === 'Not Provided' || bankName === 'Not Set') {
+            bankName = String(payoutWithAccount.bankName || '').trim();
+          }
+          // Self-heal: update User profile in database so it reflects permanently
+          syncUpdates.push(
+            Promise.resolve(supabase.from('User').update({ bankName, accountNumber }).eq('id', u.id))
+          );
+        }
+      }
+
+      // Sync User.walletBalance in database if calculated balance is higher than stored
+      if (realCalculatedBalance > currentStoredBalance) {
+        syncUpdates.push(
+          Promise.resolve(supabase.from('User').update({ walletBalance: effectiveWalletBalance }).eq('id', u.id))
+        );
+      }
+
+      // Check if user should be listed in Organizers Directory:
+      const isOrganizer =
+        u.role === 'ORGANIZER' ||
+        userEvents.length > 0 ||
+        totalRevenue > 0 ||
+        effectiveWalletBalance > 0 ||
+        (accountNumber && accountNumber !== 'Not Provided' && accountNumber !== 'Not Set') ||
+        userPayouts.length > 0;
+
+      if (isOrganizer) {
+        organizersList.push({
+          id: u.id,
+          name: u.name || 'Unnamed Organizer',
+          email: u.email,
+          phone: u.phone || 'N/A',
+          role: u.role,
+          university: u.university || 'N/A',
+          isBanned: u.isBanned || false,
+          createdAt: u.createdAt,
+          walletBalance: effectiveWalletBalance,
+          totalRevenue,
+          totalWithdrawn,
+          pendingWithdrawals,
+          bankName: bankName || 'Not Provided',
+          accountNumber: accountNumber || 'Not Provided',
+          bankCode: u.bankCode || '',
+          subaccountCode: u.subaccountCode || '',
+          eventsCount: userEvents.length,
+          events: userEvents,
+          recentPayouts: userPayouts.slice(0, 3),
+        });
+      }
+    }
+
+    // Execute background syncs non-blockingly
+    if (syncUpdates.length > 0) {
+      Promise.allSettled(syncUpdates).catch(err => console.warn('Directory auto-sync warning:', err));
+    }
+
+    res.status(200).json(organizersList);
   } catch (error: any) {
     console.error('Error fetching organizers directory:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// 2c. Admin Update Organizer Bank Account Details
+export const updateOrganizerBankDetails = async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { bankName, accountNumber, bankCode } = req.body;
+
+    if (!bankName || !accountNumber) {
+      return res.status(400).json({ message: 'Bank name and account number are required' });
+    }
+
+    let cleanAccount = String(accountNumber).trim().replace(/\D/g, '');
+    if (cleanAccount.length === 11 && cleanAccount.startsWith('0')) {
+      cleanAccount = cleanAccount.substring(1);
+    }
+
+    if (cleanAccount.length !== 10) {
+      return res.status(400).json({ message: 'Please enter a valid 10-digit account number' });
+    }
+
+    const { data: updatedUser, error: updateErr } = await supabase
+      .from('User')
+      .update({
+        bankName: String(bankName).trim(),
+        accountNumber: cleanAccount,
+        bankCode: bankCode ? String(bankCode).trim() : null,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select('id, name, email, bankName, accountNumber, bankCode, walletBalance')
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.status(200).json({
+      message: 'Organizer bank details updated and saved successfully.',
+      user: updatedUser,
+    });
+  } catch (error: any) {
+    console.error('Error updating organizer bank details:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// 2d. Admin Update / Adjust Organizer Wallet Balance
+export const updateOrganizerWallet = async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { walletBalance } = req.body;
+
+    const numBal = Number(walletBalance);
+    if (isNaN(numBal) || numBal < 0) {
+      return res.status(400).json({ message: 'Please provide a valid positive wallet balance amount.' });
+    }
+
+    const { data: updatedUser, error: updateErr } = await supabase
+      .from('User')
+      .update({
+        walletBalance: numBal,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select('id, name, email, walletBalance')
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.status(200).json({
+      message: `Organizer wallet balance updated to ₦${numBal.toLocaleString()}.`,
+      user: updatedUser,
+    });
+  } catch (error: any) {
+    console.error('Error updating organizer wallet balance:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };

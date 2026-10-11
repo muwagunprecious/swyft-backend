@@ -16,6 +16,7 @@ import orderRoutes from './routes/order.routes';
 import voteRoutes from './routes/vote.routes';
 import organizerRoutes from './routes/organizer.routes';
 import adminRoutes from './routes/admin.routes';
+import payoutRoutes from './routes/payout.routes';
 
 import path from 'path';
 
@@ -33,6 +34,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/votes', voteRoutes);
 app.use('/api/organizer', organizerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payouts', payoutRoutes);
 
 // Health Check
 app.get('/health', async (req: Request, res: Response) => {
