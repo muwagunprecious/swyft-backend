@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { sendOrganizerTicketSaleNotification } from '../services/email.service';
 
 // 1. Get Platform Statistics
 export const getStats = async (req: AuthRequest, res: Response) => {
@@ -729,3 +730,97 @@ export const getUserAuditTrail = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
+
+/**
+ * 13. Resend organizer sale notifications for all past completed orders in the database
+ */
+export const resendPastSalesToOrganizers = async (req: AuthRequest, res: Response) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from('Order')
+      .select('id, totalPrice, status, createdAt, user:User(*), payment:Payment(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*, organizer:User(*))))')
+      .eq('status', 'COMPLETED');
+
+    if (error) throw error;
+
+    let dispatchedCount = 0;
+    const results: any[] = [];
+
+    for (const order of (orders || [])) {
+      const buyer = Array.isArray(order.user) ? order.user[0] : order.user;
+      const paymentRecord = Array.isArray(order.payment) ? order.payment[0] : order.payment;
+      const ref = paymentRecord?.reference || `ORD-${order.id.substring(0, 8)}`;
+      const orderItems = order.orderItems || [];
+
+      for (const item of orderItems) {
+        const ticket = item.ticket;
+        const event = ticket?.event;
+        const organizer = Array.isArray(event?.organizer) ? event?.organizer[0] : event?.organizer;
+
+        if (organizer && organizer.email) {
+          const exactPrice = orderItems.length === 1
+            ? order.totalPrice
+            : Math.round(order.totalPrice / orderItems.length);
+
+          try {
+            await sendOrganizerTicketSaleNotification({
+              organizerEmail: organizer.email,
+              organizerName: organizer.name || 'Organizer',
+              eventTitle: event?.title || 'Event',
+              buyerName: buyer?.name || 'Guest Attendee',
+              buyerEmail: buyer?.email,
+              buyerPhone: buyer?.phone || undefined,
+              ticketName: ticket?.name || 'General Admission',
+              quantity: item.quantity || 1,
+              pricePaid: exactPrice,
+              totalOrderPrice: order.totalPrice,
+              orderReference: ref,
+              orderId: order.id,
+              purchaseDate: order.createdAt
+                ? new Date(order.createdAt).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : undefined,
+            });
+
+            dispatchedCount++;
+            results.push({
+              orderId: order.id,
+              organizerEmail: organizer.email,
+              event: event?.title,
+              buyer: buyer?.name,
+              pricePaid: exactPrice,
+              status: 'sent',
+            });
+
+            // Brief throttle between emails to respect SMTP / Resend rate limits
+            await new Promise((r) => setTimeout(r, 1200));
+          } catch (err: any) {
+            console.error(`Failed to send email to organizer ${organizer.email} for order ${order.id}:`, err);
+            results.push({
+              orderId: order.id,
+              organizerEmail: organizer.email,
+              status: 'failed',
+              error: err.message,
+            });
+          }
+        }
+      }
+    }
+
+    res.status(200).json({
+      message: `Successfully processed and resent notifications for ${dispatchedCount} ticket sales.`,
+      dispatchedCount,
+      details: results,
+    });
+  } catch (err: any) {
+    console.error('Error resending past sales notifications:', err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+  }
+};
+

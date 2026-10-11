@@ -570,4 +570,176 @@ export const sendWelcomeEmail = async (email: string, name?: string) => {
   }
 };
 
+export interface OrganizerTicketSaleParams {
+  organizerEmail: string;
+  organizerName: string;
+  eventTitle: string;
+  buyerName: string;
+  buyerEmail?: string;
+  buyerPhone?: string;
+  ticketName: string;
+  quantity: number;
+  pricePaid: number;
+  totalOrderPrice?: number;
+  orderReference: string;
+  orderId?: string;
+  purchaseDate?: string;
+}
+
+/**
+ * 5. ORGANIZER TICKET SALE NOTIFICATION EMAIL
+ * Triggered immediately when a ticket is purchased so the organizer knows
+ * a ticket was sold, who bought it, and the exact price paid.
+ */
+export const sendOrganizerTicketSaleNotification = async ({
+  organizerEmail,
+  organizerName,
+  eventTitle,
+  buyerName,
+  buyerEmail,
+  buyerPhone,
+  ticketName,
+  quantity,
+  pricePaid,
+  totalOrderPrice,
+  orderReference,
+  orderId,
+  purchaseDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }),
+}: OrganizerTicketSaleParams) => {
+  try {
+    const formattedPrice = `₦${(pricePaid ?? 0).toLocaleString()}`;
+    const cleanOrgName = organizerName || 'Organizer';
+    const cleanBuyerName = buyerName || 'Guest Attendee';
+
+    const textContent = `Great news, ${cleanOrgName}!\n\nA ticket has just been sold for your event: "${eventTitle}".\n\nBuyer: ${cleanBuyerName}\n${buyerEmail ? `Email: ${buyerEmail}\n` : ''}${buyerPhone ? `Phone: ${buyerPhone}\n` : ''}Ticket: ${quantity}x ${ticketName}\nAmount Paid: ${formattedPrice}\nOrder Reference: ${orderReference}\nDate: ${purchaseDate}\n\nLog in to your Swyft organizer dashboard to view your updated ticket sales and wallet balance.`;
+
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+        
+        <!-- Top Brand Header -->
+        <div style="background-color: #0a0a0a; padding: 28px 24px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: #fafafa;">SWYFT</h1>
+          <p style="margin: 4px 0 0 0; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.12em;">Ticket Sale Notification</p>
+        </div>
+
+        <!-- Hero Notification Banner -->
+        <div style="padding: 32px 24px 20px 24px;">
+          <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 1.5px solid #a7f3d0; padding: 20px 22px; border-radius: 14px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span style="font-size: 24px;">🎉</span>
+              <h2 style="margin: 0; color: #065f46; font-size: 19px; font-weight: 800;">
+                You Just Sold a Ticket!
+              </h2>
+            </div>
+            <p style="margin: 0; color: #047857; font-size: 13px; line-height: 1.5;">
+              Hello <strong>${cleanOrgName}</strong>, a new attendee has just completed payment for your event <strong>"${eventTitle}"</strong>.
+            </p>
+          </div>
+
+          <!-- Highlight Amount Card -->
+          <div style="background-color: #fafafa; border: 1px solid #e5e7eb; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 24px;">
+            <p style="margin: 0 0 4px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #6b7280;">Amount Paid</p>
+            <h3 style="margin: 0; font-size: 32px; font-weight: 900; color: #059669; letter-spacing: -0.02em;">
+              ${formattedPrice}
+            </h3>
+            <p style="margin: 6px 0 0 0; font-size: 12px; font-weight: 600; color: #374151;">
+              ${quantity}x ${ticketName}
+            </p>
+          </div>
+
+          <!-- Attendee & Transaction Breakdown -->
+          <h3 style="margin: 0 0 12px 0; color: #111827; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">
+            Buyer & Ticket Details
+          </h3>
+          
+          <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #374151;">
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Event</td>
+                <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">${eventTitle}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Buyer Name</td>
+                <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">${cleanBuyerName}</td>
+              </tr>
+              ${buyerEmail ? `
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Buyer Email</td>
+                <td style="padding: 8px 0; font-family: monospace; font-size: 12px; text-align: right; color: #374151; border-bottom: 1px solid #f3f4f6;">${buyerEmail}</td>
+              </tr>
+              ` : ''}
+              ${buyerPhone ? `
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Buyer Phone</td>
+                <td style="padding: 8px 0; font-family: monospace; font-size: 12px; text-align: right; color: #374151; border-bottom: 1px solid #f3f4f6;">${buyerPhone}</td>
+              </tr>
+              ` : ''}
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Ticket Tier</td>
+                <td style="padding: 8px 0; font-weight: 600; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">${ticketName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Quantity</td>
+                <td style="padding: 8px 0; font-weight: 600; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">${quantity}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Total Paid</td>
+                <td style="padding: 8px 0; font-weight: 800; text-align: right; color: #059669; border-bottom: 1px solid #f3f4f6;">${formattedPrice}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Payment Reference</td>
+                <td style="padding: 8px 0; font-family: monospace; font-size: 11px; font-weight: 700; text-align: right; color: #111827; border-bottom: 1px solid #f3f4f6;">${orderReference}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280;">Purchase Date</td>
+                <td style="padding: 8px 0; font-weight: 500; text-align: right; color: #4b5563;">${purchaseDate}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Quick Action Button -->
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="https://swyft-mu.vercel.app/organizer" style="background-color: #0a0a0a; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700; padding: 13px 32px; border-radius: 9999px; display: inline-block; letter-spacing: 0.02em;">
+              View Organizer Dashboard & Wallet →
+            </a>
+          </div>
+
+          <!-- Footer Note -->
+          <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px; line-height: 1.5;">
+            This email was sent to ${organizerEmail} because you host <strong>${eventTitle}</strong> on Swyft Tickets.<br/>
+            © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Swyft Tickets" <${gmailUser}>`,
+      replyTo: `"Swyft Support" <${gmailUser}>`,
+      to: organizerEmail,
+      subject: `🎟️ Ticket Sold! ₦${(pricePaid ?? 0).toLocaleString()} for ${eventTitle} (${cleanBuyerName})`,
+      text: textContent,
+      html: htmlContent,
+      headers: {
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+      },
+    };
+
+    const info = await sendWithRetry(mailOptions);
+    console.log(`✉️ Organizer ticket sale notification sent to ${organizerEmail} (Message ID: ${info.messageId})`);
+    return info;
+  } catch (error) {
+    console.error(`❌ Error sending organizer ticket sale notification to ${organizerEmail}:`, error);
+    throw error;
+  }
+};
+
+
 

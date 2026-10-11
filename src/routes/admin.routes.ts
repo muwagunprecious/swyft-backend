@@ -14,6 +14,7 @@ import {
   getUserAuditTrail,
   updateOrganizerBankDetails,
   updateOrganizerWallet,
+  resendPastSalesToOrganizers,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -24,6 +25,7 @@ router.use(authenticate, authorize(['ADMIN']));
 router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.get('/organizers', getOrganizersDirectory);
+router.post('/organizers/resend-past-sales', resendPastSalesToOrganizers);
 router.put('/organizers/:userId/bank-details', updateOrganizerBankDetails);
 router.put('/organizers/:userId/wallet', updateOrganizerWallet);
 router.post('/users/:userId/ban', toggleBan);

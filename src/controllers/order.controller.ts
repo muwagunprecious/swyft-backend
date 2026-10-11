@@ -2,22 +2,23 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
 import crypto from 'crypto';
-import { sendOrderReceiptEmail, sendTicketPassEmail } from '../services/email.service';
+import {
+  sendOrderReceiptEmail,
+  sendTicketPassEmail,
+  sendOrganizerTicketSaleNotification,
+} from '../services/email.service';
 import bcrypt from 'bcryptjs';
 
 /**
  * Dispatch post-payment emails:
- * 1. Order Receipt email FIRST
+ * 1. Order Receipt email FIRST to the buyer
  * 2. Ticket Pass email (with downloadable PDF attached) SECOND for each ticket item
+ * 3. Organizer Ticket Sale Notification to the organizer immediately so they know
+ *    a ticket was sold, who bought it, and the exact price paid.
  */
 const dispatchPostPaymentEmails = async (payment: any) => {
   try {
     const user = payment.order?.user;
-    if (!user || !user.email) {
-      console.warn('⚠️ dispatchPostPaymentEmails: No recipient email found for order', payment.orderId);
-      return;
-    }
-
     const orderItems = payment.order?.orderItems || [];
     const items = orderItems.map((item: any) => ({
       ticketName: item.ticket?.name || 'General Admission',
@@ -28,56 +29,141 @@ const dispatchPostPaymentEmails = async (payment: any) => {
     const firstEvent = orderItems[0]?.ticket?.event;
     const eventName = firstEvent?.title || 'Campus Event';
 
-    // 1. Send Order Receipt Email FIRST
-    console.log(`🚀 Dispatching receipt email FIRST to ${user.email}...`);
-    try {
-      await sendOrderReceiptEmail({
-        email: user.email,
-        name: user.name || 'Valued Guest',
-        eventName,
-        reference: payment.reference,
-        amount: payment.amount,
-        orderId: payment.orderId,
-        phone: user.phone || undefined,
-        items,
-      });
-      console.log(`✅ Order receipt email sent successfully to ${user.email}`);
-    } catch (receiptErr) {
-      console.error(`❌ Failed to send receipt email to ${user.email}:`, receiptErr);
-    }
-
-    // 2. Pause 2.5s between emails to prevent mail servers flagging back-to-back delivery as spam
-    await new Promise((r) => setTimeout(r, 2500));
-
-    // 3. Send Ticket Pass Email with attached PDF SECOND
-    for (const item of orderItems) {
+    // 1. Send Order Receipt Email FIRST to the buyer
+    if (user && user.email) {
+      console.log(`🚀 Dispatching receipt email FIRST to ${user.email}...`);
       try {
-        const event = item.ticket?.event;
-        const formattedDate = event?.date
-          ? new Date(event.date).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })
-          : 'Event Date TBA';
-
-        console.log(`🚀 Dispatching ticket pass email SECOND to ${user.email} (Token: ${item.qrCode})...`);
-        await sendTicketPassEmail({
+        await sendOrderReceiptEmail({
           email: user.email,
           name: user.name || 'Valued Guest',
-          eventName: event?.title || 'Campus Event',
-          ticketType: item.ticket?.name || 'Admission Pass',
-          venue: event?.location || 'Campus Center',
-          date: formattedDate,
-          verificationId: item.qrCode,
+          eventName,
           reference: payment.reference,
+          amount: payment.amount,
+          orderId: payment.orderId,
           phone: user.phone || undefined,
-          university: user.university || undefined,
+          items,
         });
-        console.log(`✅ Ticket pass with PDF attachment sent to ${user.email}`);
-      } catch (ticketErr) {
-        console.error(`❌ Failed to send ticket pass email to ${user.email}:`, ticketErr);
+        console.log(`✅ Order receipt email sent successfully to ${user.email}`);
+      } catch (receiptErr) {
+        console.error(`❌ Failed to send receipt email to ${user.email}:`, receiptErr);
+      }
+
+      // 2. Pause 2s between buyer emails to prevent spam flags
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // 3. Send Ticket Pass Email with attached PDF SECOND
+      for (const item of orderItems) {
+        try {
+          const event = item.ticket?.event;
+          const formattedDate = event?.date
+            ? new Date(event.date).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : 'Event Date TBA';
+
+          console.log(`🚀 Dispatching ticket pass email to buyer ${user.email} (Token: ${item.qrCode})...`);
+          await sendTicketPassEmail({
+            email: user.email,
+            name: user.name || 'Valued Guest',
+            eventName: event?.title || 'Campus Event',
+            ticketType: item.ticket?.name || 'Admission Pass',
+            venue: event?.location || 'Campus Center',
+            date: formattedDate,
+            verificationId: item.qrCode,
+            reference: payment.reference,
+            phone: user.phone || undefined,
+            university: user.university || undefined,
+          });
+          console.log(`✅ Ticket pass with PDF attachment sent to ${user.email}`);
+        } catch (ticketErr) {
+          console.error(`❌ Failed to send ticket pass email to ${user.email}:`, ticketErr);
+        }
+      }
+    } else {
+      console.warn('⚠️ dispatchPostPaymentEmails: No recipient email found for order', payment.orderId);
+    }
+
+    // 4. Send Organizer Ticket Sale Notification immediately
+    // Group tickets sold by organizer so multi-item purchases notify each respective organizer
+    const orgNotifications: Record<string, {
+      organizer: any;
+      eventTitle: string;
+      ticketName: string;
+      quantity: number;
+      pricePaid: number;
+    }[]> = {};
+
+    for (const item of orderItems) {
+      const event = item.ticket?.event;
+      let organizer = event?.organizer;
+
+      // If organizer wasn't joined directly, fetch by organizerId
+      if (!organizer && event?.organizerId) {
+        try {
+          const { data: orgData } = await supabase
+            .from('User')
+            .select('id, name, email')
+            .eq('id', event.organizerId)
+            .single();
+          if (orgData) organizer = orgData;
+        } catch (orgFetchErr) {
+          console.warn('Could not fetch organizer for event:', event.id, orgFetchErr);
+        }
+      }
+
+      if (organizer && organizer.email) {
+        const orgId = organizer.id || organizer.email;
+        if (!orgNotifications[orgId]) {
+          orgNotifications[orgId] = [];
+        }
+        
+        // Exact price paid for this ticket
+        const exactPrice = orderItems.length === 1
+          ? (payment.amount ?? payment.order?.totalPrice ?? 0)
+          : Math.round((payment.amount ?? payment.order?.totalPrice ?? 0) / orderItems.length);
+
+        orgNotifications[orgId].push({
+          organizer,
+          eventTitle: event?.title || 'Your Event',
+          ticketName: item.ticket?.name || 'General Admission',
+          quantity: item.quantity || 1,
+          pricePaid: exactPrice,
+        });
+      }
+    }
+
+    // Send notifications to organizers
+    for (const orgId of Object.keys(orgNotifications)) {
+      const itemsForOrg = orgNotifications[orgId];
+      if (itemsForOrg.length === 0) continue;
+
+      const primary = itemsForOrg[0];
+      const totalOrgQty = itemsForOrg.reduce((s, it) => s + it.quantity, 0);
+      const totalOrgPaid = itemsForOrg.reduce((s, it) => s + it.pricePaid, 0);
+      const ticketTypesDesc = itemsForOrg.map(it => `${it.quantity}x ${it.ticketName}`).join(', ');
+
+      try {
+        console.log(`🚀 Dispatching ticket sale notification to organizer ${primary.organizer.email}...`);
+        await sendOrganizerTicketSaleNotification({
+          organizerEmail: primary.organizer.email,
+          organizerName: primary.organizer.name || 'Event Organizer',
+          eventTitle: primary.eventTitle,
+          buyerName: user?.name || 'Guest Attendee',
+          buyerEmail: user?.email,
+          buyerPhone: user?.phone || undefined,
+          ticketName: ticketTypesDesc,
+          quantity: totalOrgQty,
+          pricePaid: totalOrgPaid,
+          totalOrderPrice: payment.amount ?? payment.order?.totalPrice,
+          orderReference: payment.reference,
+          orderId: payment.orderId,
+        });
+        console.log(`✅ Organizer sale notification sent successfully to ${primary.organizer.email}`);
+      } catch (orgMailErr) {
+        console.error(`❌ Failed to send sale notification to organizer ${primary.organizer.email}:`, orgMailErr);
       }
     }
   } catch (error) {
@@ -367,7 +453,7 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
     // Fetch payment and related data
     const { data: payment, error: paymentError } = await supabase
       .from('Payment')
-      .select('*, order:Order(*, user:User(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*))))')
+      .select('*, order:Order(*, user:User(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*, organizer:User(*)))))')
       .eq('reference', reference)
       .single();
 
@@ -646,7 +732,7 @@ export const paystackWebhook = async (req: Request, res: Response) => {
       // Fetch payment and corresponding details from Supabase
       const { data: payment, error: paymentError } = await supabase
         .from('Payment')
-        .select('*, order:Order(*, user:User(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*))))')
+        .select('*, order:Order(*, user:User(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*, organizer:User(*)))))')
         .eq('reference', reference)
         .single();
 
