@@ -67,7 +67,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
   try {
     const { data: users, error } = await supabase
       .from('User')
-      .select('id, name, email, role, university, phone, isVerified, isBanned, createdAt')
+      .select('id, name, email, role, university, phone, isVerified, isBanned, walletBalance, bankName, accountNumber, bankCode, subaccountCode, createdAt')
       .order('createdAt', { ascending: false });
 
     if (error) throw error;
@@ -75,6 +75,67 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
     res.status(200).json(users || []);
   } catch (error: any) {
     console.error('Error fetching admin users:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// 2b. Get Organizers & Wallets Directory
+export const getOrganizersDirectory = async (req: AuthRequest, res: Response) => {
+  try {
+    // Fetch users along with their events and payouts
+    const { data: users, error } = await supabase
+      .from('User')
+      .select('id, name, email, role, university, phone, isVerified, isBanned, walletBalance, bankName, accountNumber, bankCode, subaccountCode, createdAt, events:Event(id, title), payouts:Payout(id, amount, status, bankName, accountNumber, createdAt)')
+      .order('createdAt', { ascending: false });
+
+    if (error) throw error;
+
+    // Filter for users who are organizers, have created events, have a bank account, or have a wallet balance
+    const organizers = (users || []).filter(
+      (u: any) =>
+        u.role === 'ORGANIZER' ||
+        (u.events && u.events.length > 0) ||
+        u.accountNumber ||
+        (typeof u.walletBalance === 'number' && u.walletBalance > 0)
+    );
+
+    const formatted = organizers.map((u: any) => {
+      const completedPayouts = (u.payouts || []).filter((p: any) => p.status === 'COMPLETED');
+      const pendingPayouts = (u.payouts || []).filter((p: any) => p.status === 'PENDING');
+
+      const totalWithdrawn = completedPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      const pendingWithdrawals = pendingPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+      // Preferred bank account: user's saved bank settings, or last payout bank info
+      const latestPayout = (u.payouts || [])[0];
+      const bankName = u.bankName || latestPayout?.bankName || 'Not Provided';
+      const accountNumber = u.accountNumber || latestPayout?.accountNumber || 'Not Provided';
+
+      return {
+        id: u.id,
+        name: u.name || 'Unnamed Organizer',
+        email: u.email,
+        phone: u.phone || 'N/A',
+        role: u.role,
+        university: u.university || 'N/A',
+        isBanned: u.isBanned || false,
+        createdAt: u.createdAt,
+        walletBalance: typeof u.walletBalance === 'number' ? u.walletBalance : 0,
+        bankName,
+        accountNumber,
+        bankCode: u.bankCode || '',
+        subaccountCode: u.subaccountCode || '',
+        totalWithdrawn,
+        pendingWithdrawals,
+        eventsCount: (u.events || []).length,
+        events: u.events || [],
+        recentPayouts: (u.payouts || []).slice(0, 3),
+      };
+    });
+
+    res.status(200).json(formatted);
+  } catch (error: any) {
+    console.error('Error fetching organizers directory:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
