@@ -643,7 +643,7 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
         // Fetch ONLY successful/completed order items
         const { data: completedItems, error: itemsErr } = await supabase
           .from('OrderItem')
-          .select('id, quantity, ticket:Ticket(name, price, event:Event(title)), order:Order!inner(id, createdAt, status, user:User(name, email))')
+          .select('id, quantity, ticket:Ticket(name, price, event:Event(title)), order:Order!inner(id, createdAt, status, totalPrice, user:User(name, email))')
           .in('ticketId', ticketIds)
           .eq('order.status', 'COMPLETED')
           .order('id', { ascending: false });
@@ -652,7 +652,7 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
           console.error('Error fetching completed items for wallet:', itemsErr);
         } else if (completedItems) {
           for (const item of completedItems as any[]) {
-            const itemAmount = (item.ticket?.price || 0) * (item.quantity || 1);
+            const itemAmount = item.order?.totalPrice !== undefined && item.order?.totalPrice !== null ? item.order.totalPrice : ((item.ticket?.price || 0) * (item.quantity || 1));
             totalRevenue += itemAmount;
             transactions.push({
               id: item.id,
@@ -785,12 +785,13 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
       if (ticketIds.length > 0) {
         const { data: completedItems } = await supabase
           .from('OrderItem')
-          .select('quantity, ticket:Ticket(price), order:Order!inner(status)')
+          .select('quantity, ticket:Ticket(price), order:Order!inner(status, totalPrice)')
           .in('ticketId', ticketIds)
           .eq('order.status', 'COMPLETED');
 
         (completedItems || []).forEach((item: any) => {
-          totalRevenue += (item.ticket?.price || 0) * (item.quantity || 1);
+          const itemAmount = item.order?.totalPrice !== undefined && item.order?.totalPrice !== null ? item.order.totalPrice : ((item.ticket?.price || 0) * (item.quantity || 1));
+          totalRevenue += itemAmount;
         });
       }
     }

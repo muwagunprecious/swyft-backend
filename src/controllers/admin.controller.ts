@@ -90,17 +90,17 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
 
     if (usersErr) throw usersErr;
 
-    // 2. Fetch all events, tickets, completed order items, and payouts in parallel
-    const [eventsRes, ticketsRes, completedItemsRes, payoutsRes] = await Promise.all([
+    // 2. Fetch all events, tickets, completed orders (with user details and items), and payouts in parallel
+    const [eventsRes, ticketsRes, completedOrdersRes, payoutsRes] = await Promise.all([
       supabase.from('Event').select('id, title, organizerId'),
-      supabase.from('Ticket').select('id, name, price, sold, eventId'),
-      supabase.from('OrderItem').select('id, quantity, ticketId, ticket:Ticket(id, price, eventId), order:Order!inner(status)').eq('order.status', 'COMPLETED'),
+      supabase.from('Ticket').select('id, name, price, discountPrice, discountEndsAt, sold, eventId'),
+      supabase.from('Order').select('id, totalPrice, status, createdAt, userId, user:User(id, name, email, phone), items:OrderItem(id, quantity, qrCode, ticket:Ticket(id, name, price, discountPrice, discountEndsAt, eventId, event:Event(id, title, organizerId)))').eq('status', 'COMPLETED'),
       supabase.from('Payout').select('*').order('createdAt', { ascending: false }),
     ]);
 
     const events = eventsRes.data || [];
     const tickets = ticketsRes.data || [];
-    const completedItems = completedItemsRes.data || [];
+    const completedOrders = completedOrdersRes.data || [];
     const payouts = payoutsRes.data || [];
 
     // Map events by organizer
@@ -110,24 +110,47 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
       eventsByOrg[ev.organizerId].push(ev);
     }
 
-    // Map ticket sold revenue by organizer (sold * price)
-    const ticketRevByOrg: Record<string, number> = {};
-    for (const t of tickets) {
-      const ev = events.find((e: any) => e.id === t.eventId);
-      if (ev && ev.organizerId) {
-        ticketRevByOrg[ev.organizerId] = (ticketRevByOrg[ev.organizerId] || 0) + ((t.sold || 0) * (t.price || 0));
-      }
-    }
+    // Map completed orders, exact revenue, tickets sold, and buyer details by organizer
+    const revByOrg: Record<string, number> = {};
+    const ticketsSoldByOrg: Record<string, number> = {};
+    const buyersByOrg: Record<string, any[]> = {};
 
-    // Map completed order item revenue by organizer (quantity * ticket.price)
-    const itemRevByOrg: Record<string, number> = {};
-    for (const item of completedItems) {
-      const t = item.ticket as any;
-      if (t && t.eventId) {
-        const ev = events.find((e: any) => e.id === t.eventId);
-        if (ev && ev.organizerId) {
-          const itemTotal = (t.price || 0) * (item.quantity || 1);
-          itemRevByOrg[ev.organizerId] = (itemRevByOrg[ev.organizerId] || 0) + itemTotal;
+    for (const ord of (completedOrders as any[])) {
+      const ordUser = Array.isArray(ord.user) ? ord.user[0] : (ord.user || {});
+      // Group items in this order by organizer
+      const itemsByOrgInOrder: Record<string, any[]> = {};
+      for (const item of (ord.items || [])) {
+        const ticket = Array.isArray(item.ticket) ? item.ticket[0] : (item.ticket || {});
+        const event = Array.isArray(ticket.event) ? ticket.event[0] : (ticket.event || {});
+        const orgId = event.organizerId;
+        if (orgId) {
+          if (!itemsByOrgInOrder[orgId]) itemsByOrgInOrder[orgId] = [];
+          itemsByOrgInOrder[orgId].push({ item, ticket, event });
+        }
+      }
+
+      for (const [orgId, orderOrgItems] of Object.entries(itemsByOrgInOrder)) {
+        // Exactly credit the actual order totalPrice paid by the buyer (handles discounts, free tickets, normal prices)
+        revByOrg[orgId] = (revByOrg[orgId] || 0) + (ord.totalPrice || 0);
+
+        for (const entry of orderOrgItems) {
+          const { item, ticket, event } = entry;
+          ticketsSoldByOrg[orgId] = (ticketsSoldByOrg[orgId] || 0) + (item.quantity || 1);
+
+          if (!buyersByOrg[orgId]) buyersByOrg[orgId] = [];
+          buyersByOrg[orgId].push({
+            orderId: ord.id,
+            buyerName: ordUser.name || 'Guest Attendee',
+            buyerEmail: ordUser.email || 'N/A',
+            buyerPhone: ordUser.phone || 'N/A',
+            ticketName: ticket.name || 'General Admission',
+            eventTitle: event.title || 'Unknown Event',
+            quantity: item.quantity || 1,
+            pricePaid: orderOrgItems.length === 1 ? ord.totalPrice : Math.round(ord.totalPrice / orderOrgItems.length),
+            totalOrderPaid: ord.totalPrice,
+            createdAt: ord.createdAt,
+            qrCode: item.qrCode,
+          });
         }
       }
     }
@@ -145,11 +168,11 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
     for (const u of (users || [])) {
       const userEvents = eventsByOrg[u.id] || [];
       const userPayouts = payoutsByUser[u.id] || [];
+      const userBuyers = buyersByOrg[u.id] || [];
+      const userTicketsSold = ticketsSoldByOrg[u.id] || 0;
 
-      // Ground truth revenue: take max of completed OrderItems revenue and ticket.sold revenue
-      const tRev = ticketRevByOrg[u.id] || 0;
-      const iRev = itemRevByOrg[u.id] || 0;
-      const totalRevenue = Math.max(tRev, iRev);
+      // Ground truth revenue: actual exact paid amounts from completed orders
+      const totalRevenue = revByOrg[u.id] || 0;
 
       const completedPayouts = userPayouts.filter((p: any) => p.status === 'COMPLETED');
       const pendingPayouts = userPayouts.filter((p: any) => p.status === 'PENDING');
@@ -157,10 +180,9 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
       const totalWithdrawn = completedPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
       const pendingWithdrawals = pendingPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-      // Real live available balance: total revenue minus withdrawn and pending
+      // Real live available balance: exact revenue minus completed withdrawals and pending requests
       const realCalculatedBalance = Math.max(0, totalRevenue - totalWithdrawn - pendingWithdrawals);
-      const currentStoredBalance = typeof u.walletBalance === 'number' ? u.walletBalance : 0;
-      const effectiveWalletBalance = Math.max(currentStoredBalance, realCalculatedBalance);
+      const effectiveWalletBalance = realCalculatedBalance;
 
       // Bank account resolution:
       // Priority 1: User's saved bank account in User table
@@ -182,8 +204,8 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
         }
       }
 
-      // Sync User.walletBalance in database if calculated balance is higher than stored
-      if (realCalculatedBalance > currentStoredBalance) {
+      // Sync User.walletBalance in database if DB differs from exact calculated balance
+      if (u.walletBalance !== effectiveWalletBalance) {
         syncUpdates.push(
           Promise.resolve(supabase.from('User').update({ walletBalance: effectiveWalletBalance }).eq('id', u.id))
         );
@@ -218,6 +240,8 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
           subaccountCode: u.subaccountCode || '',
           eventsCount: userEvents.length,
           events: userEvents,
+          ticketsSold: userTicketsSold,
+          buyers: userBuyers,
           recentPayouts: userPayouts.slice(0, 3),
         });
       }
