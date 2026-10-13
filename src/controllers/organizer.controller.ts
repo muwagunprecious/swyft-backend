@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { sendOrderReceiptEmail, sendTicketPassEmail } from '../services/email.service';
+import { syncOrganizerWallet, calculateItemPaidAmount } from '../services/wallet.service';
 
 // ─── ICON / COLOR MAPS (shared) ─────────────────────────────────────────────
 const iconMap: Record<string, string> = {
@@ -40,58 +41,34 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     // 1. Fetch Events + Tickets (FAST)
     const { data: eventsRes } = await supabase
       .from('Event')
-      .select('id, title, createdAt, Ticket(id, sold, price, quantity)')
+      .select('id, title, createdAt, Ticket(id, sold, price, discountPrice, discountEndsAt, quantity)')
       .eq('organizerId', organizerId);
 
     const events = eventsRes || [];
     const eventIds = events.map((e: any) => e.id);
     const ticketIds = events.flatMap((e: any) => e.Ticket?.map((t: any) => t.id) || []);
 
-    if (eventIds.length === 0) {
-      const { data: userRecord } = await supabase
-        .from('User')
-        .select('walletBalance')
-        .eq('id', organizerId)
-        .single();
+    // 2. Fetch live accurate wallet metrics (exact completed revenue with discounts)
+    const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
 
+    if (eventIds.length === 0) {
       return res.status(200).json({ 
-        stats: { revenue: 0, walletBalance: userRecord?.walletBalance || 0, withdrawnAmount: 0, pendingWithdrawals: 0, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
+        stats: { revenue: 0, walletBalance: availableBalance, withdrawnAmount, pendingWithdrawals, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
         sales: [], 
         activity: [] 
       });
     }
 
-    // Compute basic event stats
-    let revenue = 0, ticketsSold = 0;
+    // Compute basic ticket counts
+    let ticketsSold = 0;
     events.forEach((e: any) => {
       (e.Ticket || []).forEach((t: any) => {
         ticketsSold += t.sold || 0;
-        revenue += (t.sold || 0) * (t.price || 0);
       });
     });
 
-    // Fetch payouts to calculate net wallet balance
-    const { data: payouts } = await supabase
-      .from('Payout')
-      .select('amount, status')
-      .eq('userId', organizerId);
-
-    let withdrawnAmount = 0;
-    let pendingWithdrawals = 0;
-    (payouts || []).forEach((p: any) => {
-      if (p.status === 'COMPLETED') withdrawnAmount += p.amount || 0;
-      else if (p.status === 'PENDING') pendingWithdrawals += p.amount || 0;
-    });
-
-    const { data: userRecord } = await supabase
-      .from('User')
-      .select('walletBalance')
-      .eq('id', organizerId)
-      .single();
-
-    const walletBalance = typeof userRecord?.walletBalance === 'number'
-      ? userRecord.walletBalance
-      : Math.max(0, revenue - withdrawnAmount - pendingWithdrawals);
+    const revenue = totalRevenue;
+    const walletBalance = availableBalance;
 
     // Fetch VoteCategories to get categoryIds
     const { data: categories } = await supabase
@@ -107,10 +84,10 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         ? supabase.from('Vote').select('*', { count: 'exact', head: true }).in('categoryId', categoryIds)
         : Promise.resolve({ count: 0 }),
 
-      // B. Recent sales for the sales table
+      // B. Recent sales for the sales table (include totalPrice and discounts)
       ticketIds.length > 0
         ? supabase.from('OrderItem')
-            .select('id, order:Order(status, createdAt, user:User(name)), ticket:Ticket(name, price, eventId)')
+            .select('id, quantity, order:Order(id, status, createdAt, totalPrice, user:User(name)), ticket:Ticket(name, price, discountPrice, eventId)')
             .in('ticketId', ticketIds)
             .order('id', { ascending: false })
             .limit(10)
@@ -141,18 +118,26 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     // Helper to find event title by ID
     const getEventTitle = (id: string) => events.find((e: any) => e.id === id)?.title || 'Unknown Event';
 
-    // ── Build sales list ─────────────────────────────────────────────────────
-    const sales = (salesRes.data || []).map((item: any) => ({
-      id: item.id,
-      user: { name: item.order?.user?.name || 'Unknown' },
-      ticket: {
-        type: item.ticket?.name || 'Ticket',
-        price: item.ticket?.price || 0,
-        event: { title: getEventTitle(item.ticket?.eventId) }
-      },
-      status: item.order?.status === 'COMPLETED' ? 'Paid' : 'Pending',
-      createdAt: item.order?.createdAt
-    }));
+    // ── Build sales list with accurate paid price (reflecting discounts) ───────
+    const sales = (salesRes.data || []).map((item: any) => {
+      const ord = item.order;
+      const isPaid = ord?.status === 'COMPLETED';
+      const exactPaidPrice = isPaid && ord?.totalPrice !== undefined && ord?.totalPrice !== null
+        ? ord.totalPrice
+        : (item.ticket?.discountPrice ?? item.ticket?.price ?? 0);
+
+      return {
+        id: item.id,
+        user: { name: ord?.user?.name || 'Unknown' },
+        ticket: {
+          type: item.ticket?.name || 'Ticket',
+          price: exactPaidPrice,
+          event: { title: getEventTitle(item.ticket?.eventId) }
+        },
+        status: isPaid ? 'Paid' : 'Pending',
+        createdAt: ord?.createdAt
+      };
+    });
 
     // ── Build activity feed ──────────────────────────────────────────────────
     const activities: any[] = [];
@@ -224,40 +209,23 @@ export const getStats = async (req: AuthRequest, res: Response) => {
   try {
     const organizerId = req.user?.userId;
     if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    // Live exact wallet and revenue calculation (honoring discounts)
+    const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
+
     const { data: events, error } = await supabase
-      .from('Event').select('*, Ticket(*), VoteCategory(*, Vote(id))').eq('organizerId', organizerId);
+      .from('Event').select('id, Ticket(sold), VoteCategory(id, Vote(id))').eq('organizerId', organizerId);
     if (error) throw error;
-    let revenue = 0, ticketsSold = 0, totalVotes = 0;
+
+    let ticketsSold = 0, totalVotes = 0;
     (events || []).forEach((event: any) => {
-      (event.Ticket || []).forEach((t: any) => { ticketsSold += t.sold || 0; revenue += (t.sold || 0) * (t.price || 0); });
+      (event.Ticket || []).forEach((t: any) => { ticketsSold += t.sold || 0; });
       (event.VoteCategory || []).forEach((vc: any) => { totalVotes += (vc.Vote || []).length; });
     });
 
-    const { data: payouts } = await supabase
-      .from('Payout')
-      .select('amount, status')
-      .eq('userId', organizerId);
-
-    let withdrawnAmount = 0;
-    let pendingWithdrawals = 0;
-    (payouts || []).forEach((p: any) => {
-      if (p.status === 'COMPLETED') withdrawnAmount += p.amount || 0;
-      else if (p.status === 'PENDING') pendingWithdrawals += p.amount || 0;
-    });
-
-    const { data: userRecord } = await supabase
-      .from('User')
-      .select('walletBalance')
-      .eq('id', organizerId)
-      .single();
-
-    const walletBalance = typeof userRecord?.walletBalance === 'number'
-      ? userRecord.walletBalance
-      : Math.max(0, revenue - withdrawnAmount - pendingWithdrawals);
-
     res.status(200).json({
-      revenue,
-      walletBalance,
+      revenue: totalRevenue,
+      walletBalance: availableBalance,
       withdrawnAmount,
       pendingWithdrawals,
       ticketsSold,
@@ -275,25 +243,32 @@ export const getAttendees = async (req: AuthRequest, res: Response) => {
     // Fetch all completed order items for events owned by this organizer
     const { data: items, error } = await supabase
       .from('OrderItem')
-      .select('id, isUsed, qrCode, order:Order!inner(*, user:User(name, email, phone)), ticket:Ticket!inner(*, event:Event!inner(title, organizerId))')
+      .select('id, isUsed, qrCode, quantity, order:Order!inner(id, totalPrice, createdAt, user:User(name, email, phone)), ticket:Ticket!inner(name, price, discountPrice, event:Event!inner(title, organizerId))')
       .eq('ticket.event.organizerId', organizerId)
       .eq('order.status', 'COMPLETED')
       .order('id', { ascending: false });
 
     if (error) throw error;
 
-    res.status(200).json((items || []).map((item: any) => ({
-      id: item.id,
-      name: item.order?.user?.name || 'Unknown',
-      email: item.order?.user?.email || 'N/A',
-      phone: item.order?.user?.phone || 'N/A',
-      event: item.ticket?.event?.title || 'Unknown Event',
-      ticket: item.ticket?.name || 'Ticket',
-      amount: item.ticket?.price || 0,
-      status: item.isUsed ? 'checked-in' : 'not-checked-in',
-      date: item.order?.createdAt,
-      qrCode: item.qrCode
-    })));
+    res.status(200).json((items || []).map((item: any) => {
+      // Return the actual price paid from the completed order (honoring discounts)
+      const exactAmount = item.order?.totalPrice !== undefined && item.order?.totalPrice !== null
+        ? item.order.totalPrice
+        : (item.ticket?.discountPrice ?? item.ticket?.price ?? 0);
+
+      return {
+        id: item.id,
+        name: item.order?.user?.name || 'Unknown',
+        email: item.order?.user?.email || 'N/A',
+        phone: item.order?.user?.phone || 'N/A',
+        event: item.ticket?.event?.title || 'Unknown Event',
+        ticket: item.ticket?.name || 'Ticket',
+        amount: exactAmount,
+        status: item.isUsed ? 'checked-in' : 'not-checked-in',
+        date: item.order?.createdAt,
+        qrCode: item.qrCode
+      };
+    }));
   } catch (error: any) {
     console.error('Error fetching attendees', error);
     res.status(500).json({ message: 'Error fetching attendees', error: error.message });
@@ -326,17 +301,24 @@ export const getSales = async (req: AuthRequest, res: Response) => {
     if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
     const { data: recentItems, error } = await supabase
       .from('OrderItem')
-      .select('id, order:Order(*, user:User(name)), ticket:Ticket!inner(*, event:Event!inner(title, organizerId))')
+      .select('id, quantity, order:Order(id, totalPrice, status, createdAt, user:User(name)), ticket:Ticket!inner(name, price, discountPrice, event:Event!inner(title, organizerId))')
       .eq('ticket.event.organizerId', organizerId)
       .order('id', { ascending: false }).limit(10);
     if (error) throw error;
-    res.status(200).json((recentItems || []).map((item: any) => ({
-      id: item.id,
-      user: { name: item.order?.user?.name || 'Unknown' },
-      ticket: { type: item.ticket?.name || 'Ticket', price: item.ticket?.price || 0, event: { title: item.ticket?.event?.title || 'Unknown Event' } },
-      status: item.order?.status === 'COMPLETED' ? 'Paid' : 'Pending',
-      createdAt: item.order?.createdAt
-    })));
+    res.status(200).json((recentItems || []).map((item: any) => {
+      const isPaid = item.order?.status === 'COMPLETED';
+      const exactPrice = isPaid && item.order?.totalPrice !== undefined && item.order?.totalPrice !== null
+        ? item.order.totalPrice
+        : (item.ticket?.discountPrice ?? item.ticket?.price ?? 0);
+
+      return {
+        id: item.id,
+        user: { name: item.order?.user?.name || 'Unknown' },
+        ticket: { type: item.ticket?.name || 'Ticket', price: exactPrice, event: { title: item.ticket?.event?.title || 'Unknown Event' } },
+        status: isPaid ? 'Paid' : 'Pending',
+        createdAt: item.order?.createdAt
+      };
+    }));
   } catch (error: any) { res.status(500).json({ message: 'Error fetching sales', error: error.message }); }
 };
 
@@ -347,10 +329,36 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
     const { data: events, error } = await supabase
       .from('Event').select('*, Ticket(*)').eq('organizerId', organizerId).order('date', { ascending: true });
     if (error) throw error;
+
+    // Fetch all completed orders for this organizer to calculate exact revenue per event
+    const eventIds = (events || []).map((e: any) => e.id);
+    const eventRevenueMap: Record<string, number> = {};
+
+    if (eventIds.length > 0) {
+      const { data: completedItems } = await supabase
+        .from('OrderItem')
+        .select('id, quantity, ticket:Ticket!inner(eventId), order:Order!inner(id, totalPrice, status)')
+        .eq('order.status', 'COMPLETED')
+        .in('ticket.eventId', eventIds);
+
+      // Group by event & order to accurately aggregate order revenue without double counting
+      const processedOrders = new Set<string>();
+      for (const item of (completedItems || [])) {
+        const evId = (item.ticket as any)?.eventId;
+        const ordId = (item.order as any)?.id;
+        const ordPrice = (item.order as any)?.totalPrice || 0;
+        if (evId && ordId && !processedOrders.has(`${evId}-${ordId}`)) {
+          processedOrders.add(`${evId}-${ordId}`);
+          eventRevenueMap[evId] = (eventRevenueMap[evId] || 0) + ordPrice;
+        }
+      }
+    }
+
     res.status(200).json((events || []).map((event: any) => {
       const tickets: any[] = event.Ticket || [];
-      let sold = 0, total = 0, revenue = 0;
-      tickets.forEach((t: any) => { sold += t.sold || 0; total += t.quantity || 0; revenue += (t.sold || 0) * (t.price || 0); });
+      let sold = 0, total = 0;
+      tickets.forEach((t: any) => { sold += t.sold || 0; total += t.quantity || 0; });
+      const revenue = eventRevenueMap[event.id] || 0;
       const eventDate = event.date ? new Date(event.date) : null;
       let isPassed = false;
       if (eventDate && !isNaN(eventDate.getTime())) {
@@ -378,6 +386,8 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
           id: t.id,
           name: t.name,
           price: t.price,
+          discountPrice: t.discountPrice,
+          discountEndsAt: t.discountEndsAt,
           quantity: t.quantity,
           sold: t.sold || 0,
         }))
@@ -627,14 +637,14 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
 
     const eventIds = (events || []).map((e: any) => e.id);
 
-    // 3. Fetch Tickets
-    let totalRevenue = 0;
+    // 3. Fetch live accurate wallet metrics (honoring all discounts, no double counting)
+    const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
     const transactions: any[] = [];
 
     if (eventIds.length > 0) {
       const { data: tickets } = await supabase
         .from('Ticket')
-        .select('id, name, price, eventId')
+        .select('id, name, price, discountPrice, eventId')
         .in('eventId', eventIds);
 
       const ticketIds = (tickets || []).map((t: any) => t.id);
@@ -643,7 +653,7 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
         // Fetch ONLY successful/completed order items
         const { data: completedItems, error: itemsErr } = await supabase
           .from('OrderItem')
-          .select('id, quantity, ticket:Ticket(name, price, event:Event(title)), order:Order!inner(id, createdAt, status, totalPrice, user:User(name, email))')
+          .select('id, quantity, ticket:Ticket(name, price, discountPrice, event:Event(title)), order:Order!inner(id, createdAt, status, totalPrice, user:User(name, email))')
           .in('ticketId', ticketIds)
           .eq('order.status', 'COMPLETED')
           .order('id', { ascending: false });
@@ -651,9 +661,20 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
         if (itemsErr) {
           console.error('Error fetching completed items for wallet:', itemsErr);
         } else if (completedItems) {
+          // Group items by order to accurately apportion item price
+          const ordersMap = new Map<string, any[]>();
+          for (const item of (completedItems as any[])) {
+            const ordId = item.order?.id;
+            if (ordId) {
+              if (!ordersMap.has(ordId)) ordersMap.set(ordId, []);
+              ordersMap.get(ordId)!.push(item);
+            }
+          }
+
           for (const item of completedItems as any[]) {
-            const itemAmount = item.order?.totalPrice !== undefined && item.order?.totalPrice !== null ? item.order.totalPrice : ((item.ticket?.price || 0) * (item.quantity || 1));
-            totalRevenue += itemAmount;
+            const ordItems = ordersMap.get(item.order?.id) || [item];
+            const itemAmount = calculateItemPaidAmount(item, item.order?.totalPrice || 0, ordItems);
+
             transactions.push({
               id: item.id,
               orderId: item.order?.id,
@@ -680,22 +701,6 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     if (payoutsErr) {
       console.error('Error fetching payouts for wallet:', payoutsErr);
     }
-
-    let withdrawnAmount = 0;
-    let pendingWithdrawals = 0;
-
-    (payouts || []).forEach((p: any) => {
-      if (p.status === 'COMPLETED') {
-        withdrawnAmount += p.amount || 0;
-      } else if (p.status === 'PENDING') {
-        pendingWithdrawals += p.amount || 0;
-      }
-    });
-
-    const availableBalance = Math.max(0, totalRevenue - withdrawnAmount - pendingWithdrawals);
-
-    // Keep User.walletBalance in sync with availableBalance in database
-    await supabase.from('User').update({ walletBalance: availableBalance }).eq('id', organizerId);
 
     // Add withdrawals as debit ledger transactions
     (payouts || []).forEach((p: any) => {

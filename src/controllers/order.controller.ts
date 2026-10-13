@@ -7,6 +7,7 @@ import {
   sendTicketPassEmail,
   sendOrganizerTicketSaleNotification,
 } from '../services/email.service';
+import { syncOrganizerWallet } from '../services/wallet.service';
 import bcrypt from 'bcryptjs';
 
 /**
@@ -469,6 +470,13 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
         console.warn(`[verifyPayment] Healing stuck order ${payment.orderId} — setting to COMPLETED`);
         await supabase.from('Order').update({ status: 'COMPLETED', updatedAt: new Date() }).eq('id', payment.orderId);
       }
+      // Ensure organizer wallets are synced
+      const orgIds = Array.from(new Set(
+        (payment.order?.orderItems || []).map((item: any) => item.ticket?.event?.organizerId).filter(Boolean)
+      )) as string[];
+      for (const orgId of orgIds) {
+        await syncOrganizerWallet(orgId).catch(err => console.error(`⚠️ Failed to sync wallet for organizer ${orgId}:`, err));
+      }
       return res.status(200).json({ message: 'Already verified', orderId: payment.orderId });
     }
 
@@ -502,6 +510,20 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
     });
 
     await Promise.all(ticketPromises);
+
+    // Sync wallet balance immediately for all organizers involved in this order
+    const organizerIds = Array.from(new Set(
+      (payment.order?.orderItems || []).map((item: any) => item.ticket?.event?.organizerId).filter(Boolean)
+    )) as string[];
+
+    for (const orgId of organizerIds) {
+      try {
+        await syncOrganizerWallet(orgId);
+        console.log(`✅ [verifyPayment] Synced wallet balance for organizer ${orgId}`);
+      } catch (syncErr) {
+        console.error(`⚠️ [verifyPayment] Failed to sync wallet for organizer ${orgId}:`, syncErr);
+      }
+    }
 
     // Dispatch emails in background: Receipt FIRST, Ticket + downloadable PDF SECOND
     dispatchPostPaymentEmails(payment).catch(err => {
@@ -748,6 +770,13 @@ export const paystackWebhook = async (req: Request, res: Response) => {
           console.warn(`Webhook: Healing stuck order ${payment.orderId} — setting to COMPLETED`);
           await supabase.from('Order').update({ status: 'COMPLETED', updatedAt: new Date() }).eq('id', payment.orderId);
         }
+        // Ensure organizer wallets are synced
+        const orgIds = Array.from(new Set(
+          (payment.order?.orderItems || []).map((item: any) => item.ticket?.event?.organizerId).filter(Boolean)
+        )) as string[];
+        for (const orgId of orgIds) {
+          await syncOrganizerWallet(orgId).catch(err => console.error(`⚠️ Webhook: Failed to sync wallet for organizer ${orgId}:`, err));
+        }
         return res.status(200).json({ message: 'Already verified' });
       }
 
@@ -777,6 +806,20 @@ export const paystackWebhook = async (req: Request, res: Response) => {
           .from('Ticket')
           .update({ sold: (ticket?.sold || 0) + item.quantity })
           .eq('id', item.ticketId);
+      }
+
+      // Sync organizer wallet balances immediately
+      const organizerIds = Array.from(new Set(
+        (payment.order?.orderItems || []).map((item: any) => item.ticket?.event?.organizerId).filter(Boolean)
+      )) as string[];
+
+      for (const orgId of organizerIds) {
+        try {
+          await syncOrganizerWallet(orgId);
+          console.log(`✅ Webhook: Synced wallet balance for organizer ${orgId}`);
+        } catch (syncErr) {
+          console.error(`⚠️ Webhook: Failed to sync wallet for organizer ${orgId}:`, syncErr);
+        }
       }
 
       // 4. Dispatch post-payment emails (Receipt first, Ticket + PDF second)
