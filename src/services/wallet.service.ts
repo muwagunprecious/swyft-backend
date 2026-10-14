@@ -44,35 +44,29 @@ export interface WalletSyncResult {
  */
 export async function syncOrganizerWallet(organizerId: string): Promise<WalletSyncResult> {
   try {
-    // 1. Fetch events for this organizer (retry once on network error)
-    let events: any[] | null = null;
-    let evErr: any = null;
+    // 1. Fetch user to get existing balance as baseline / safeguard
+    const { data: userRec } = await supabase
+      .from('User')
+      .select('id, name, email, walletBalance')
+      .eq('id', organizerId)
+      .single();
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const res = await supabase
-        .from('Event')
-        .select('id')
-        .eq('organizerId', organizerId);
-      if (!res.error) {
-        events = res.data;
-        evErr = null;
-        break;
-      }
-      evErr = res.error;
-      if (attempt < 2) await new Promise(r => setTimeout(r, 400));
-    }
+    const existingBal = userRec?.walletBalance || 0;
+
+    // 2. Fetch events for this organizer
+    const { data: events, error: evErr } = await supabase
+      .from('Event')
+      .select('id, title')
+      .eq('organizerId', organizerId);
 
     if (evErr) {
       console.error(`[syncOrganizerWallet] Error fetching events for organizer ${organizerId}:`, evErr);
-      // Fallback: fetch existing User.walletBalance so we don't return 0 on network glitch
-      const { data: userRec } = await supabase.from('User').select('walletBalance').eq('id', organizerId).single();
-      const existingBal = userRec?.walletBalance || 0;
       return { totalRevenue: existingBal, availableBalance: existingBal, withdrawnAmount: 0, pendingWithdrawals: 0 };
     }
 
     const eventIds = (events || []).map((e: any) => e.id);
 
-    // Fetch payouts for this organizer
+    // 3. Fetch payouts for this organizer
     const { data: payouts } = await supabase
       .from('Payout')
       .select('amount, status')
@@ -81,105 +75,61 @@ export async function syncOrganizerWallet(organizerId: string): Promise<WalletSy
     let withdrawnAmount = 0;
     let pendingWithdrawals = 0;
     (payouts || []).forEach((p: any) => {
-      if (p.status === 'COMPLETED') withdrawnAmount += p.amount || 0;
-      else if (p.status === 'PENDING') pendingWithdrawals += p.amount || 0;
+      if (p.status === 'COMPLETED') withdrawnAmount += (p.amount || 0);
+      else if (p.status === 'PENDING') pendingWithdrawals += (p.amount || 0);
     });
 
-    if (eventIds.length === 0) {
-      const availableBalance = Math.max(0, -withdrawnAmount - pendingWithdrawals);
-      await supabase.from('User').update({ walletBalance: availableBalance }).eq('id', organizerId);
-      return { totalRevenue: 0, availableBalance, withdrawnAmount, pendingWithdrawals };
-    }
+    // 4. Fetch all completed orders with items, tickets, and events
+    // This direct query is 100% identical to the proven admin.controller.ts logic
+    const { data: completedOrders, error: ordersErr } = await supabase
+      .from('Order')
+      .select('id, totalPrice, status, createdAt, items:OrderItem(id, quantity, ticket:Ticket(id, name, price, discountPrice, discountEndsAt, eventId, event:Event(id, title, organizerId)))')
+      .eq('status', 'COMPLETED');
 
-    // 2. Fetch all tickets for these events
-    let tickets: any[] | null = null;
-    let ticketsErr: any = null;
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const res = await supabase
-        .from('Ticket')
-        .select('id')
-        .in('eventId', eventIds);
-      if (!res.error) {
-        tickets = res.data;
-        ticketsErr = null;
-        break;
-      }
-      ticketsErr = res.error;
-      if (attempt < 2) await new Promise(r => setTimeout(r, 400));
-    }
-
-    if (ticketsErr) {
-      console.error(`[syncOrganizerWallet] Error fetching tickets for organizer ${organizerId}:`, ticketsErr);
-      const { data: userRec } = await supabase.from('User').select('walletBalance').eq('id', organizerId).single();
-      const existingBal = userRec?.walletBalance || 0;
+    if (ordersErr) {
+      console.error(`[syncOrganizerWallet] Error fetching completed orders for organizer ${organizerId}:`, ordersErr);
       return { totalRevenue: existingBal, availableBalance: existingBal, withdrawnAmount, pendingWithdrawals };
     }
 
-    const ticketIds = (tickets || []).map((t: any) => t.id);
     let totalRevenue = 0;
 
-    if (ticketIds.length > 0) {
-      // 3. Fetch all completed order items for these tickets
-      let orderItems: any[] | null = null;
-      let itemsErr: any = null;
+    for (const ord of (completedOrders as any[] || [])) {
+      const orderItems = ord.items || [];
+      const orderOrgItems = orderItems.filter((item: any) => {
+        const ticket = Array.isArray(item.ticket) ? item.ticket[0] : item.ticket;
+        const event = Array.isArray(ticket?.event) ? ticket?.event[0] : ticket?.event;
+        const orgId = event?.organizerId;
+        const evId = ticket?.eventId;
+        return orgId === organizerId || (evId && eventIds.includes(evId));
+      });
 
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        const res = await supabase
-          .from('OrderItem')
-          .select('id, quantity, ticketId, ticket:Ticket(id, price, discountPrice, eventId), order:Order!inner(id, totalPrice, status)')
-          .in('ticketId', ticketIds)
-          .eq('order.status', 'COMPLETED');
-        if (!res.error) {
-          orderItems = res.data;
-          itemsErr = null;
-          break;
-        }
-        itemsErr = res.error;
-        if (attempt < 2) await new Promise(r => setTimeout(r, 400));
-      }
-
-      if (itemsErr) {
-        console.error(`[syncOrganizerWallet] Error fetching order items for organizer ${organizerId}:`, itemsErr);
-        const { data: userRec } = await supabase.from('User').select('walletBalance').eq('id', organizerId).single();
-        const existingBal = userRec?.walletBalance || 0;
-        return { totalRevenue: existingBal, availableBalance: existingBal, withdrawnAmount, pendingWithdrawals };
-      } else if (orderItems) {
-        // Group items by order to avoid double-counting order.totalPrice
-        const ordersMap = new Map<string, { totalPrice: number; items: any[] }>();
-
-        for (const item of (orderItems as any[])) {
-          const ord = item.order;
-          if (!ord) continue;
-          if (!ordersMap.has(ord.id)) {
-            ordersMap.set(ord.id, {
-              totalPrice: ord.totalPrice || 0,
-              items: [],
-            });
+      if (orderOrgItems.length > 0) {
+        if (orderOrgItems.length === orderItems.length) {
+          totalRevenue += (ord.totalPrice || 0);
+        } else {
+          for (const item of orderOrgItems) {
+            totalRevenue += calculateItemPaidAmount(item, ord.totalPrice || 0, orderItems);
           }
-          ordersMap.get(ord.id)!.items.push(item);
-        }
-
-        // Sum actual revenue per order
-        for (const orderData of ordersMap.values()) {
-          totalRevenue += orderData.totalPrice;
         }
       }
     }
 
     // Available balance = revenue - completed payouts - pending payouts
-    const availableBalance = Math.max(0, totalRevenue - withdrawnAmount - pendingWithdrawals);
+    const calculatedBalance = Math.max(0, totalRevenue - withdrawnAmount - pendingWithdrawals);
+    const availableBalance = calculatedBalance;
 
-    // Update User.walletBalance in Supabase to keep DB permanently in sync
-    const { error: updateErr } = await supabase
-      .from('User')
-      .update({ walletBalance: availableBalance })
-      .eq('id', organizerId);
+    // Update User.walletBalance in Supabase if different
+    if (userRec && userRec.walletBalance !== availableBalance) {
+      const { error: updateErr } = await supabase
+        .from('User')
+        .update({ walletBalance: availableBalance })
+        .eq('id', organizerId);
 
-    if (updateErr) {
-      console.error(`[syncOrganizerWallet] Error updating wallet balance in DB for organizer ${organizerId}:`, updateErr);
-    } else {
-      console.log(`[syncOrganizerWallet] Organizer ${organizerId} wallet updated: Revenue=₦${totalRevenue}, Available=₦${availableBalance}`);
+      if (updateErr) {
+        console.error(`[syncOrganizerWallet] Error updating wallet balance in DB for organizer ${organizerId}:`, updateErr);
+      } else {
+        console.log(`[syncOrganizerWallet] Organizer ${organizerId} (${userRec.email}) wallet synced: Revenue=₦${totalRevenue}, Available=₦${availableBalance}`);
+      }
     }
 
     return {

@@ -146,6 +146,10 @@ export const login = async (req: Request, res: Response) => {
         name: user.name,
         role: user.role,
         university: user.university || null,
+        walletBalance: user.walletBalance || 0,
+        bankName: user.bankName || '',
+        accountNumber: user.accountNumber || '',
+        bankCode: user.bankCode || '',
       },
     });
   } catch (error: any) {
@@ -242,7 +246,7 @@ export const getMe = async (req: Request, res: Response) => {
 
     const { data: user, error } = await supabase
       .from('User')
-      .select('id, email, name, role, university, phone, createdAt')
+      .select('id, email, name, role, university, phone, createdAt, walletBalance, bankName, accountNumber, bankCode')
       .eq('id', userId)
       .single();
 

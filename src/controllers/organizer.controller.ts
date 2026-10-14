@@ -48,12 +48,21 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     const eventIds = events.map((e: any) => e.id);
     const ticketIds = events.flatMap((e: any) => e.Ticket?.map((t: any) => t.id) || []);
 
+    // Fetch user for baseline walletBalance safeguard
+    const { data: userRec } = await supabase
+      .from('User')
+      .select('walletBalance')
+      .eq('id', organizerId)
+      .single();
+
     // 2. Fetch live accurate wallet metrics (exact completed revenue with discounts)
     const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
+    const finalAvailableBalance = Math.max(availableBalance, userRec?.walletBalance || 0);
+    const finalRevenue = Math.max(totalRevenue, finalAvailableBalance + withdrawnAmount + pendingWithdrawals);
 
     if (eventIds.length === 0) {
       return res.status(200).json({ 
-        stats: { revenue: 0, walletBalance: availableBalance, withdrawnAmount, pendingWithdrawals, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
+        stats: { revenue: finalRevenue, walletBalance: finalAvailableBalance, withdrawnAmount, pendingWithdrawals, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
         sales: [], 
         activity: [] 
       });
@@ -67,8 +76,8 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       });
     });
 
-    const revenue = totalRevenue;
-    const walletBalance = availableBalance;
+    const revenue = finalRevenue;
+    const walletBalance = finalAvailableBalance;
 
     // Fetch VoteCategories to get categoryIds
     const { data: categories } = await supabase
@@ -622,10 +631,10 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     const organizerId = req.user?.userId;
     if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
 
-    // 1. Fetch User Payout & Profile Details
+    // 1. Fetch User Payout, Profile & WalletBalance Details
     const { data: user } = await supabase
       .from('User')
-      .select('name, email, phone, bankName, accountNumber, bankCode')
+      .select('name, email, phone, bankName, accountNumber, bankCode, walletBalance')
       .eq('id', organizerId)
       .single();
 
@@ -639,54 +648,51 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
 
     // 3. Fetch live accurate wallet metrics (honoring all discounts, no double counting)
     const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
+    
+    // Ensure availableBalance respects database baseline if greater
+    const finalAvailableBalance = Math.max(availableBalance, user?.walletBalance || 0);
+    const finalTotalRevenue = Math.max(totalRevenue, finalAvailableBalance + withdrawnAmount + pendingWithdrawals);
+
     const transactions: any[] = [];
 
-    if (eventIds.length > 0) {
-      const { data: tickets } = await supabase
-        .from('Ticket')
-        .select('id, name, price, discountPrice, eventId')
-        .in('eventId', eventIds);
+    // Fetch ONLY successful/completed order items (using direct Order query, matching admin.controller.ts)
+    const { data: completedOrders, error: ordersErr } = await supabase
+      .from('Order')
+      .select('id, createdAt, status, totalPrice, user:User(name, email), items:OrderItem(id, quantity, ticket:Ticket(name, price, discountPrice, eventId, event:Event(title, organizerId)))')
+      .eq('status', 'COMPLETED')
+      .order('createdAt', { ascending: false });
 
-      const ticketIds = (tickets || []).map((t: any) => t.id);
+    if (ordersErr) {
+      console.error('Error fetching completed orders for wallet:', ordersErr);
+    } else if (completedOrders) {
+      for (const ord of (completedOrders as any[])) {
+        const orderItems = ord.items || [];
+        const matchingItems = orderItems.filter((item: any) => {
+          const ticket = Array.isArray(item.ticket) ? item.ticket[0] : item.ticket;
+          const event = Array.isArray(ticket?.event) ? ticket?.event[0] : ticket?.event;
+          const orgId = event?.organizerId;
+          const evId = ticket?.eventId;
+          return orgId === organizerId || (evId && eventIds.includes(evId));
+        });
 
-      if (ticketIds.length > 0) {
-        // Fetch ONLY successful/completed order items
-        const { data: completedItems, error: itemsErr } = await supabase
-          .from('OrderItem')
-          .select('id, quantity, ticket:Ticket(name, price, discountPrice, event:Event(title)), order:Order!inner(id, createdAt, status, totalPrice, user:User(name, email))')
-          .in('ticketId', ticketIds)
-          .eq('order.status', 'COMPLETED')
-          .order('id', { ascending: false });
+        const ordUser = Array.isArray(ord.user) ? ord.user[0] : ord.user;
 
-        if (itemsErr) {
-          console.error('Error fetching completed items for wallet:', itemsErr);
-        } else if (completedItems) {
-          // Group items by order to accurately apportion item price
-          const ordersMap = new Map<string, any[]>();
-          for (const item of (completedItems as any[])) {
-            const ordId = item.order?.id;
-            if (ordId) {
-              if (!ordersMap.has(ordId)) ordersMap.set(ordId, []);
-              ordersMap.get(ordId)!.push(item);
-            }
-          }
+        for (const item of matchingItems) {
+          const ticket = Array.isArray(item.ticket) ? item.ticket[0] : item.ticket;
+          const event = Array.isArray(ticket?.event) ? ticket?.event[0] : ticket?.event;
+          const itemAmount = calculateItemPaidAmount(item, ord.totalPrice || 0, orderItems);
 
-          for (const item of completedItems as any[]) {
-            const ordItems = ordersMap.get(item.order?.id) || [item];
-            const itemAmount = calculateItemPaidAmount(item, item.order?.totalPrice || 0, ordItems);
-
-            transactions.push({
-              id: item.id,
-              orderId: item.order?.id,
-              event: item.ticket?.event?.title || 'Event',
-              ticketType: item.ticket?.name || 'Ticket',
-              quantity: item.quantity || 1,
-              amount: itemAmount,
-              customer: item.order?.user?.name || item.order?.user?.email || 'Guest Attendee',
-              date: item.order?.createdAt,
-              status: 'Completed',
-            });
-          }
+          transactions.push({
+            id: item.id,
+            orderId: ord.id,
+            event: event?.title || 'Event',
+            ticketType: ticket?.name || 'Ticket',
+            quantity: item.quantity || 1,
+            amount: itemAmount,
+            customer: ordUser?.name || ordUser?.email || 'Guest Attendee',
+            date: ord.createdAt,
+            status: 'Completed',
+          });
         }
       }
     }
@@ -722,8 +728,8 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     transactions.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
     res.status(200).json({
-      totalRevenue,
-      availableBalance,
+      totalRevenue: finalTotalRevenue,
+      availableBalance: finalAvailableBalance,
       pendingWithdrawals,
       withdrawnAmount,
       bankDetails: {
@@ -759,7 +765,7 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
     // 1. Fetch User details
     const { data: user } = await supabase
       .from('User')
-      .select('name, email, phone, bankName, accountNumber')
+      .select('name, email, phone, bankName, accountNumber, walletBalance')
       .eq('id', organizerId)
       .single();
 
@@ -771,58 +777,17 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Bank name and account number are required for withdrawal.' });
     }
 
-    // 2. Calculate current available balance strictly from successful ticket payments
-    const { data: events } = await supabase
-      .from('Event')
-      .select('id')
-      .eq('organizerId', organizerId);
+    // 2. Fetch live accurate wallet metrics via centralized sync
+    const { availableBalance } = await syncOrganizerWallet(organizerId);
+    const finalAvailable = Math.max(availableBalance, user?.walletBalance || 0);
 
-    const eventIds = (events || []).map((e: any) => e.id);
-    let totalRevenue = 0;
-
-    if (eventIds.length > 0) {
-      const { data: tickets } = await supabase
-        .from('Ticket')
-        .select('id, price')
-        .in('eventId', eventIds);
-
-      const ticketIds = (tickets || []).map((t: any) => t.id);
-      if (ticketIds.length > 0) {
-        const { data: completedItems } = await supabase
-          .from('OrderItem')
-          .select('quantity, ticket:Ticket(price), order:Order!inner(status, totalPrice)')
-          .in('ticketId', ticketIds)
-          .eq('order.status', 'COMPLETED');
-
-        (completedItems || []).forEach((item: any) => {
-          const itemAmount = item.order?.totalPrice !== undefined && item.order?.totalPrice !== null ? item.order.totalPrice : ((item.ticket?.price || 0) * (item.quantity || 1));
-          totalRevenue += itemAmount;
-        });
-      }
-    }
-
-    // 3. Fetch past payouts to check balance
-    const { data: payouts } = await supabase
-      .from('Payout')
-      .select('amount, status')
-      .eq('userId', organizerId);
-
-    let alreadyWithdrawn = 0;
-    (payouts || []).forEach((p: any) => {
-      if (p.status === 'COMPLETED' || p.status === 'PENDING') {
-        alreadyWithdrawn += p.amount || 0;
-      }
-    });
-
-    const availableBalance = totalRevenue - alreadyWithdrawn;
-
-    if (withdrawAmount > availableBalance) {
+    if (withdrawAmount > finalAvailable) {
       return res.status(400).json({
-        message: `Insufficient funds. Your available balance is ₦${Math.max(0, availableBalance).toLocaleString()}.`,
+        message: `Insufficient funds. Your available balance is ₦${Math.max(0, finalAvailable).toLocaleString()}.`,
       });
     }
 
-    // 4. Create Payout Request in PENDING status
+    // 3. Create Payout Request in PENDING status
     const payoutId = crypto.randomUUID();
     const { data: newPayout, error: payoutErr } = await supabase
       .from('Payout')
@@ -845,6 +810,9 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
       console.error('Error creating withdrawal request:', payoutErr);
       throw payoutErr;
     }
+
+    // Recalculate and update wallet balance immediately
+    await syncOrganizerWallet(organizerId);
 
     // Also update user's saved bank if not set
     if (!user?.bankName || !user?.accountNumber) {
