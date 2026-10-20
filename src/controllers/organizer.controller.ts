@@ -340,7 +340,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
 
     // If lite query, omit massive base64 bannerImage strings to prevent timeouts
     const selectFields = isLite
-      ? 'id, title, date, location, status, isVotingEnabled, isVotingPaid, voteCost, Ticket(*)'
+      ? 'id, title, date, location, isSuspended, isVotingEnabled, isVotingPaid, voteCost, Ticket(*)'
       : '*, Ticket(*)';
 
     const { data: events, error } = await supabase
@@ -402,7 +402,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
         title: event.title,
         description: isLite ? undefined : event.description,
         date: event.date,
-        status: event.status || 'DRAFT',
+        status: event.status || (event.isSuspended ? 'SUSPENDED' : 'PUBLISHED'),
         bannerImage: isLite ? undefined : event.bannerImage,
         location: event.location,
         sold,
