@@ -335,30 +335,51 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
   try {
     const organizerId = req.user?.userId;
     if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const isLite = req.query?.lite === 'true';
+
+    // If lite query, omit massive base64 bannerImage strings to prevent timeouts
+    const selectFields = isLite
+      ? 'id, title, date, location, status, isVotingEnabled, isVotingPaid, voteCost, Ticket(*)'
+      : '*, Ticket(*)';
+
     const { data: events, error } = await supabase
-      .from('Event').select('*, Ticket(*)').eq('organizerId', organizerId).order('date', { ascending: true });
+      .from('Event')
+      .select(selectFields)
+      .eq('organizerId', organizerId)
+      .order('date', { ascending: true });
+
     if (error) throw error;
 
     // Fetch all completed orders for this organizer to calculate exact revenue per event
     const eventIds = (events || []).map((e: any) => e.id);
     const eventRevenueMap: Record<string, number> = {};
 
-    if (eventIds.length > 0) {
-      const { data: completedItems } = await supabase
-        .from('OrderItem')
-        .select('id, quantity, ticket:Ticket!inner(eventId), order:Order!inner(id, totalPrice, status)')
-        .eq('order.status', 'COMPLETED')
-        .in('ticket.eventId', eventIds);
+    if (eventIds.length > 0 && !isLite) {
+      const ticketIds = (events || []).flatMap((e: any) => (e.Ticket || []).map((t: any) => t.id));
+      if (ticketIds.length > 0) {
+        const { data: completedItems } = await supabase
+          .from('OrderItem')
+          .select('id, quantity, ticketId, order:Order!inner(id, totalPrice, status)')
+          .eq('order.status', 'COMPLETED')
+          .in('ticketId', ticketIds);
 
-      // Group by event & order to accurately aggregate order revenue without double counting
-      const processedOrders = new Set<string>();
-      for (const item of (completedItems || [])) {
-        const evId = (item.ticket as any)?.eventId;
-        const ordId = (item.order as any)?.id;
-        const ordPrice = (item.order as any)?.totalPrice || 0;
-        if (evId && ordId && !processedOrders.has(`${evId}-${ordId}`)) {
-          processedOrders.add(`${evId}-${ordId}`);
-          eventRevenueMap[evId] = (eventRevenueMap[evId] || 0) + ordPrice;
+        const ticketToEventMap: Record<string, string> = {};
+        (events || []).forEach((e: any) => {
+          (e.Ticket || []).forEach((t: any) => {
+            ticketToEventMap[t.id] = e.id;
+          });
+        });
+
+        const processedOrders = new Set<string>();
+        for (const item of (completedItems || [])) {
+          const evId = ticketToEventMap[item.ticketId];
+          const ordId = (item.order as any)?.id;
+          const ordPrice = (item.order as any)?.totalPrice || 0;
+          if (evId && ordId && !processedOrders.has(`${evId}-${ordId}`)) {
+            processedOrders.add(`${evId}-${ordId}`);
+            eventRevenueMap[evId] = (eventRevenueMap[evId] || 0) + ordPrice;
+          }
         }
       }
     }
@@ -379,10 +400,10 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
         id: event.id,
         name: event.title,
         title: event.title,
-        description: event.description,
+        description: isLite ? undefined : event.description,
         date: event.date,
         status: event.status || 'DRAFT',
-        bannerImage: event.bannerImage,
+        bannerImage: isLite ? undefined : event.bannerImage,
         location: event.location,
         sold,
         total,
@@ -631,7 +652,7 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     const organizerId = req.user?.userId;
     if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
 
-    // 1. Fetch User Payout, Profile & WalletBalance Details
+    // 1. Fetch User Profile & Wallet Details
     const { data: user } = await supabase
       .from('User')
       .select('name, email, phone, bankName, accountNumber, bankCode, walletBalance')
@@ -641,56 +662,50 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     // 2. Fetch Events for this organizer
     const { data: events } = await supabase
       .from('Event')
-      .select('id, title')
+      .select('id, title, Ticket(id, name, price, discountPrice)')
       .eq('organizerId', organizerId);
 
     const eventIds = (events || []).map((e: any) => e.id);
+    const tickets = (events || []).flatMap((e: any) => (e.Ticket || []).map((t: any) => ({ ...t, eventTitle: e.title })));
+    const ticketIds = tickets.map((t: any) => t.id);
 
-    // 3. Fetch live accurate wallet metrics (honoring all discounts, no double counting)
+    // 3. Fetch live accurate wallet metrics (safeguarded)
     const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
-    
-    // Ensure availableBalance respects database baseline if greater
-    const finalAvailableBalance = Math.max(availableBalance, user?.walletBalance || 0);
-    const finalTotalRevenue = Math.max(totalRevenue, finalAvailableBalance + withdrawnAmount + pendingWithdrawals);
 
     const transactions: any[] = [];
 
-    // Fetch ONLY successful/completed order items (using direct Order query, matching admin.controller.ts)
-    const { data: completedOrders, error: ordersErr } = await supabase
-      .from('Order')
-      .select('id, createdAt, status, totalPrice, user:User(name, email), items:OrderItem(id, quantity, ticket:Ticket(name, price, discountPrice, eventId, event:Event(title, organizerId)))')
-      .eq('status', 'COMPLETED')
-      .order('createdAt', { ascending: false });
+    // Fetch completed order items specifically for this organizer's tickets
+    if (ticketIds.length > 0) {
+      const { data: completedItems, error: itemsErr } = await supabase
+        .from('OrderItem')
+        .select('id, quantity, ticketId, order:Order!inner(id, totalPrice, createdAt, status, user:User(name, email))')
+        .eq('order.status', 'COMPLETED')
+        .in('ticketId', ticketIds)
+        .order('id', { ascending: false })
+        .limit(50);
 
-    if (ordersErr) {
-      console.error('Error fetching completed orders for wallet:', ordersErr);
-    } else if (completedOrders) {
-      for (const ord of (completedOrders as any[])) {
-        const orderItems = ord.items || [];
-        const matchingItems = orderItems.filter((item: any) => {
-          const ticket = Array.isArray(item.ticket) ? item.ticket[0] : item.ticket;
-          const event = Array.isArray(ticket?.event) ? ticket?.event[0] : ticket?.event;
-          const orgId = event?.organizerId;
-          const evId = ticket?.eventId;
-          return orgId === organizerId || (evId && eventIds.includes(evId));
-        });
+      if (itemsErr) {
+        console.error('Error fetching completed items for wallet:', itemsErr);
+      } else if (completedItems) {
+        const ticketMap = new Map<string, any>(tickets.map((t: any) => [t.id, t]));
 
-        const ordUser = Array.isArray(ord.user) ? ord.user[0] : ord.user;
-
-        for (const item of matchingItems) {
-          const ticket = Array.isArray(item.ticket) ? item.ticket[0] : item.ticket;
-          const event = Array.isArray(ticket?.event) ? ticket?.event[0] : ticket?.event;
-          const itemAmount = calculateItemPaidAmount(item, ord.totalPrice || 0, orderItems);
+        for (const item of (completedItems as any[])) {
+          const ord = item.order;
+          const ticket = ticketMap.get(item.ticketId);
+          const ordUser = Array.isArray(ord?.user) ? ord.user[0] : ord?.user;
+          const itemAmount = (ord?.totalPrice !== undefined && ord?.totalPrice !== null)
+            ? ord.totalPrice
+            : (ticket?.discountPrice ?? ticket?.price ?? 0) * (item.quantity || 1);
 
           transactions.push({
             id: item.id,
-            orderId: ord.id,
-            event: event?.title || 'Event',
+            orderId: ord?.id,
+            event: ticket?.eventTitle || 'Event',
             ticketType: ticket?.name || 'Ticket',
             quantity: item.quantity || 1,
             amount: itemAmount,
             customer: ordUser?.name || ordUser?.email || 'Guest Attendee',
-            date: ord.createdAt,
+            date: ord?.createdAt,
             status: 'Completed',
           });
         }
@@ -728,8 +743,8 @@ export const getWallet = async (req: AuthRequest, res: Response) => {
     transactions.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
     res.status(200).json({
-      totalRevenue: finalTotalRevenue,
-      availableBalance: finalAvailableBalance,
+      totalRevenue,
+      availableBalance,
       pendingWithdrawals,
       withdrawnAmount,
       bankDetails: {

@@ -40,6 +40,7 @@ export interface WalletSyncResult {
  * Live synchronization of an Organizer's wallet balance.
  * Recalculates exact revenue from completed orders (taking all discounts into account),
  * subtracts completed payouts and pending withdrawal requests,
+ * preserves database baseline balance safeguard,
  * updates User.walletBalance in the database, and returns the live totals.
  */
 export async function syncOrganizerWallet(organizerId: string): Promise<WalletSyncResult> {
@@ -79,62 +80,62 @@ export async function syncOrganizerWallet(organizerId: string): Promise<WalletSy
       else if (p.status === 'PENDING') pendingWithdrawals += (p.amount || 0);
     });
 
-    // 4. Fetch all completed orders with items, tickets, and events
-    // This direct query is 100% identical to the proven admin.controller.ts logic
-    const { data: completedOrders, error: ordersErr } = await supabase
-      .from('Order')
-      .select('id, totalPrice, status, createdAt, items:OrderItem(id, quantity, ticket:Ticket(id, name, price, discountPrice, discountEndsAt, eventId, event:Event(id, title, organizerId)))')
-      .eq('status', 'COMPLETED');
+    // 4. Fetch completed orders specifically for this organizer's tickets
+    let calculatedRevenue = 0;
 
-    if (ordersErr) {
-      console.error(`[syncOrganizerWallet] Error fetching completed orders for organizer ${organizerId}:`, ordersErr);
-      return { totalRevenue: existingBal, availableBalance: existingBal, withdrawnAmount, pendingWithdrawals };
-    }
+    if (eventIds.length > 0) {
+      const { data: tickets } = await supabase
+        .from('Ticket')
+        .select('id, eventId')
+        .in('eventId', eventIds);
 
-    let totalRevenue = 0;
+      const ticketIds = (tickets || []).map((t: any) => t.id);
 
-    for (const ord of (completedOrders as any[] || [])) {
-      const orderItems = ord.items || [];
-      const orderOrgItems = orderItems.filter((item: any) => {
-        const ticket = Array.isArray(item.ticket) ? item.ticket[0] : item.ticket;
-        const event = Array.isArray(ticket?.event) ? ticket?.event[0] : ticket?.event;
-        const orgId = event?.organizerId;
-        const evId = ticket?.eventId;
-        return orgId === organizerId || (evId && eventIds.includes(evId));
-      });
+      if (ticketIds.length > 0) {
+        const { data: orderItems, error: itemsErr } = await supabase
+          .from('OrderItem')
+          .select('id, quantity, ticketId, order:Order!inner(id, totalPrice, status)')
+          .eq('order.status', 'COMPLETED')
+          .in('ticketId', ticketIds);
 
-      if (orderOrgItems.length > 0) {
-        if (orderOrgItems.length === orderItems.length) {
-          totalRevenue += (ord.totalPrice || 0);
-        } else {
-          for (const item of orderOrgItems) {
-            totalRevenue += calculateItemPaidAmount(item, ord.totalPrice || 0, orderItems);
+        if (itemsErr) {
+          console.error(`[syncOrganizerWallet] Error fetching order items for organizer ${organizerId}:`, itemsErr);
+        } else if (orderItems) {
+          const processedOrders = new Set<string>();
+          for (const it of orderItems) {
+            const ord = it.order as any;
+            if (ord?.id && !processedOrders.has(ord.id)) {
+              processedOrders.add(ord.id);
+              calculatedRevenue += (ord.totalPrice || 0);
+            }
           }
         }
       }
     }
 
-    // Available balance = revenue - completed payouts - pending payouts
-    const calculatedBalance = Math.max(0, totalRevenue - withdrawnAmount - pendingWithdrawals);
-    const availableBalance = calculatedBalance;
+    // 5. Available balance = revenue - completed payouts - pending payouts
+    const rawCalculatedBalance = Math.max(0, calculatedRevenue - withdrawnAmount - pendingWithdrawals);
+    // Baseline safeguard: never drop below verified existing wallet balance
+    const finalAvailableBalance = Math.max(rawCalculatedBalance, existingBal);
+    const finalTotalRevenue = Math.max(calculatedRevenue, finalAvailableBalance + withdrawnAmount + pendingWithdrawals);
 
     // Update User.walletBalance in Supabase if different
-    if (userRec && userRec.walletBalance !== availableBalance) {
+    if (userRec && userRec.walletBalance !== finalAvailableBalance) {
       const { error: updateErr } = await supabase
         .from('User')
-        .update({ walletBalance: availableBalance })
+        .update({ walletBalance: finalAvailableBalance })
         .eq('id', organizerId);
 
       if (updateErr) {
         console.error(`[syncOrganizerWallet] Error updating wallet balance in DB for organizer ${organizerId}:`, updateErr);
       } else {
-        console.log(`[syncOrganizerWallet] Organizer ${organizerId} (${userRec.email}) wallet synced: Revenue=₦${totalRevenue}, Available=₦${availableBalance}`);
+        console.log(`[syncOrganizerWallet] Organizer ${organizerId} (${userRec.email}) wallet synced: Revenue=₦${finalTotalRevenue}, Available=₦${finalAvailableBalance}`);
       }
     }
 
     return {
-      totalRevenue,
-      availableBalance,
+      totalRevenue: finalTotalRevenue,
+      availableBalance: finalAvailableBalance,
       withdrawnAmount,
       pendingWithdrawals,
     };
