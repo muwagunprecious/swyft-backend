@@ -19,7 +19,7 @@ const resendFrom = process.env.RESEND_FROM || 'Swyft Tickets <info@swyft-ticket.
 const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
 
 const gmailUser = process.env.GMAIL_USER || 'swyftticket@gmail.com';
-const gmailPass = (process.env.GMAIL_APP_PASSWORD || 'pvnx otjj ynki pugj').replace(/\s+/g, '');
+const gmailPass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
 
 const transporter = nodemailer.createTransport({
   pool: true,

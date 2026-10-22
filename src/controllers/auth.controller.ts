@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { supabase } from '../config/supabase';
 import { sendPasswordResetEmail } from '../services/email.service';
 
@@ -296,18 +297,30 @@ export const forgotPassword = async (req: Request, res: Response) => {
       attempts: 0,
     });
 
-    // Send reset email asynchronously
-    sendPasswordResetEmail({
-      email: user.email,
-      name: user.name,
-      resetCode,
-    }).catch(err => {
-      console.error('Failed to send password reset email in background:', err);
-    });
+    // Create a stateless cryptographically signed resetToken that works across serverless lambdas
+    const secret = process.env.JWT_SECRET || 'swyft_secret_key_2026_super_secure';
+    const codeHash = crypto.createHmac('sha256', secret).update(resetCode).digest('hex');
+    const resetToken = jwt.sign({ email: cleanEmail, codeHash }, secret, { expiresIn: '15m' });
+
+    // CRITICAL FOR VERCEL SERVERLESS: AWAIT email delivery so lambda runtime is NOT paused early
+    try {
+      await sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        resetCode,
+      });
+      console.log(`✉️ Password reset email successfully sent to ${cleanEmail}`);
+    } catch (mailErr: any) {
+      console.error('❌ Failed to send password reset email:', mailErr);
+      return res.status(500).json({
+        message: 'Unable to deliver password reset email right now. Please try again in a few moments.'
+      });
+    }
 
     res.status(200).json({
       message: 'Password reset code has been sent to your email.',
       email: cleanEmail,
+      resetToken,
     });
   } catch (error: any) {
     console.error('forgotPassword error:', error);
@@ -317,7 +330,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
 export const resetPassword = async (req: Request, res: Response) => {
   try {
-    const { email, code, newPassword } = req.body;
+    const { email, code, newPassword, resetToken } = req.body;
 
     if (!email || !code || !newPassword) {
       return res.status(400).json({ message: 'Email, verification code, and new password are required' });
@@ -329,19 +342,43 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.trim();
+    const secret = process.env.JWT_SECRET || 'swyft_secret_key_2026_super_secure';
 
-    const record = resetStore.get(cleanEmail);
-    if (!record || record.expiresAt < Date.now()) {
-      return res.status(400).json({ message: 'Reset code has expired or was not requested. Please request a new code.' });
+    let isCodeValid = false;
+
+    // 1. First, check stateless signed resetToken (immune to serverless container recycling)
+    if (resetToken) {
+      try {
+        const decoded = jwt.verify(resetToken, secret) as { email: string; codeHash: string };
+        if (decoded.email && decoded.email.toLowerCase() === cleanEmail) {
+          const expectedHash = crypto.createHmac('sha256', secret).update(cleanCode).digest('hex');
+          if (expectedHash === decoded.codeHash) {
+            isCodeValid = true;
+          }
+        }
+      } catch (tokenErr) {
+        console.warn('resetToken verification failed, falling back to resetStore:', tokenErr);
+      }
     }
 
-    if (record.code !== cleanCode) {
-      record.attempts += 1;
-      if (record.attempts >= 5) {
-        resetStore.delete(cleanEmail);
-        return res.status(400).json({ message: 'Too many invalid attempts. Please request a new code.' });
+    // 2. Fallback to in-memory resetStore
+    if (!isCodeValid) {
+      const record = resetStore.get(cleanEmail);
+      if (record && record.expiresAt >= Date.now()) {
+        if (record.code === cleanCode) {
+          isCodeValid = true;
+        } else {
+          record.attempts += 1;
+          if (record.attempts >= 5) {
+            resetStore.delete(cleanEmail);
+            return res.status(400).json({ message: 'Too many invalid attempts. Please request a new code.' });
+          }
+        }
       }
-      return res.status(400).json({ message: 'Invalid 6-digit verification code.' });
+    }
+
+    if (!isCodeValid) {
+      return res.status(400).json({ message: 'Invalid 6-digit verification code or code has expired. Please request a new code.' });
     }
 
     // Code is valid! Hash new password
@@ -366,4 +403,3 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
-
