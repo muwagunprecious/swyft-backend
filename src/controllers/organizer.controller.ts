@@ -289,17 +289,78 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     const organizerId = req.user?.userId;
     if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
     
-    const { id } = req.params; // OrderItem ID
-    
-    // In a real app we should check if the organizer owns the event this ticket belongs to
-    const { error } = await supabase
-      .from('OrderItem')
-      .update({ isUsed: true })
-      .eq('id', id);
+    const { id } = req.params; // OrderItem ID or qrCode (e.g. OTX-...)
+    if (!id) return res.status(400).json({ message: 'Ticket identifier is required' });
 
-    if (error) throw error;
-    res.status(200).json({ message: 'Ticket verified successfully' });
+    // Clean code if a full URL or token was passed
+    const match = id.match(/(?:code=|^)(OTX-[a-zA-Z0-9-]+)/i);
+    const lookupCode = match ? match[1] : id.trim();
+
+    // Query OrderItem by id or qrCode
+    const { data: item, error: fetchErr } = await supabase
+      .from('OrderItem')
+      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*))')
+      .or(`id.eq.${lookupCode},qrCode.eq.${lookupCode}`)
+      .maybeSingle();
+
+    if (fetchErr || !item) {
+      return res.status(404).json({ message: 'Invalid ticket: no matching record found.', status: 'invalid' });
+    }
+
+    // Authorization: ensure organizer owns the event (or is ADMIN)
+    const eventOrganizerId = item.ticket?.event?.organizerId;
+    const isAuthorized = req.user?.role === 'ADMIN' || (eventOrganizerId && eventOrganizerId === organizerId);
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        message: 'You are not authorized to scan this ticket',
+        status: 'unauthorized',
+      });
+    }
+
+    // Check if ticket has already been used
+    if (item.isUsed) {
+      return res.status(400).json({
+        message: 'This ticket has already been used',
+        status: 'used',
+        isUsed: true,
+        usedAt: item.updatedAt,
+        attendee: {
+          id: item.id,
+          name: item.order?.user?.name || 'Valued Guest',
+          email: item.order?.user?.email || '',
+          phone: item.order?.user?.phone || '',
+          ticketType: item.ticket?.name || 'General Admission',
+          event: item.ticket?.event?.title || 'Event',
+          qrCode: item.qrCode,
+        }
+      });
+    }
+
+    // If not used, mark as used!
+    const { error: updateErr } = await supabase
+      .from('OrderItem')
+      .update({ isUsed: true, updatedAt: new Date().toISOString() })
+      .eq('id', item.id);
+
+    if (updateErr) throw updateErr;
+
+    return res.status(200).json({
+      message: 'Ticket valid - Checked In Successfully! 🎉',
+      status: 'valid',
+      attendee: {
+        id: item.id,
+        name: item.order?.user?.name || 'Valued Guest',
+        email: item.order?.user?.email || '',
+        phone: item.order?.user?.phone || '',
+        ticketType: item.ticket?.name || 'General Admission',
+        event: item.ticket?.event?.title || 'Event',
+        qrCode: item.qrCode,
+        isUsed: true,
+      }
+    });
   } catch (error: any) {
+    console.error('Error verifying ticket:', error);
     res.status(500).json({ message: 'Error verifying ticket', error: error.message });
   }
 };

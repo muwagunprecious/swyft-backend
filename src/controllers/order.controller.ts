@@ -172,6 +172,18 @@ const dispatchPostPaymentEmails = async (payment: any) => {
   }
 };
 
+export const isEventPassed = (dateString?: string): boolean => {
+  if (!dateString) return false;
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return false;
+  if (dateString.length <= 10) {
+    const endOfDay = new Date(d);
+    endOfDay.setHours(23, 59, 59, 999);
+    return Date.now() > endOfDay.getTime();
+  }
+  return Date.now() > d.getTime();
+};
+
 const getActiveHoldsForTicket = async (ticketId: string): Promise<number> => {
   const { data: pendingItems, error } = await supabase
     .from('OrderItem')
@@ -285,7 +297,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     // Fetch tickets independently on the critical path
     const { data: tickets, error: ticketsError } = await supabase
       .from('Ticket')
-      .select('*')
+      .select('*, event:Event(*)')
       .in('id', ticketIds);
 
     if (ticketsError || !tickets) {
@@ -299,6 +311,14 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       const ticket = tickets.find((t: any) => t.id === item.ticketId);
       if (!ticket) {
         return res.status(404).json({ message: `Ticket ${item.ticketId} not found` });
+      }
+
+      // Check if event has ended - ticket sales close automatically
+      const event = (ticket as any).event;
+      if (event && isEventPassed(event.date)) {
+        return res.status(400).json({
+          message: `Ticket sales have ended because "${event.title || 'this event'}" has already ended.`,
+        });
       }
       
       const holds = await getActiveHoldsForTicket(ticket.id);
@@ -400,11 +420,41 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
     const { reference } = req.params;
     console.log(`[verifyPayment] Verifying payment for reference: ${reference}`);
 
-    // Verify via Paystack (with graceful network failure bypass and 1.2s timeout for local development)
+    // Fetch payment and related data first
+    const { data: payment, error: paymentError } = await supabase
+      .from('Payment')
+      .select('*, order:Order(*, user:User(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*, organizer:User(*)))))')
+      .eq('reference', reference)
+      .maybeSingle();
+
+    if (paymentError || !payment) {
+      console.error(`[verifyPayment] Payment reference not found in database: ${reference}`, paymentError);
+      return res.status(404).json({ message: 'Payment reference not found' });
+    }
+
+    if (payment.status === 'SUCCESSFUL') {
+      console.log(`[verifyPayment] Payment already verified for reference: ${reference}`);
+      // Heal stuck orders — payment may be SUCCESSFUL but order still PENDING due to a previous crash
+      if (payment.order?.status !== 'COMPLETED') {
+        console.warn(`[verifyPayment] Healing stuck order ${payment.orderId} — setting to COMPLETED`);
+        await supabase.from('Order').update({ status: 'COMPLETED', updatedAt: new Date() }).eq('id', payment.orderId);
+      }
+      // Ensure organizer wallets are synced
+      const orgIds = Array.from(new Set(
+        (payment.order?.orderItems || []).map((item: any) => item.ticket?.event?.organizerId).filter(Boolean)
+      )) as string[];
+      for (const orgId of orgIds) {
+        await syncOrganizerWallet(orgId).catch(err => console.error(`⚠️ Failed to sync wallet for organizer ${orgId}:`, err));
+      }
+      return res.status(200).json({ message: 'Already verified', orderId: payment.orderId });
+    }
+
+    const isFreeOrder = payment.amount === 0 || payment.order?.totalPrice === 0;
+
     let data: any = null;
 
-    if (reference.startsWith('REF-')) {
-      console.log(`[verifyPayment] Detected local offline test reference: ${reference}. Bypassing Paystack API fetch.`);
+    if (isFreeOrder || reference.startsWith('REF-') || reference.startsWith('FREE-')) {
+      console.log(`[verifyPayment] Free order or test reference: ${reference}. Bypassing Paystack API fetch.`);
       data = {
         status: true,
         data: {
@@ -450,18 +500,6 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
     }
 
     console.log(`[verifyPayment] Payment verified successfully for reference: ${reference}`);
-
-    // Fetch payment and related data
-    const { data: payment, error: paymentError } = await supabase
-      .from('Payment')
-      .select('*, order:Order(*, user:User(*), orderItems:OrderItem(*, ticket:Ticket(*, event:Event(*, organizer:User(*)))))')
-      .eq('reference', reference)
-      .single();
-
-    if (paymentError || !payment) {
-      console.error(`[verifyPayment] Payment reference not found in database: ${reference}`, paymentError);
-      return res.status(404).json({ message: 'Payment reference not found' });
-    }
     
     if (payment.status === 'SUCCESSFUL') {
       console.log(`[verifyPayment] Payment already verified for reference: ${reference}`);
@@ -553,15 +591,35 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     if (!qrCode) {
       return res.status(400).json({ message: 'No ticket verification code provided', status: 'invalid' });
     }
-    
+
+    // Must be authenticated: If not logged in, an unauthorized scanner is being used
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(403).json({
+        message: 'You are not authorized to scan this ticket',
+        status: 'unauthorized',
+      });
+    }
+
     const { data: item, error } = await supabase
       .from('OrderItem')
       .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*), payment:Payment(*))')
-      .eq('qrCode', qrCode)
-      .single();
+      .or(`qrCode.eq.${qrCode},id.eq.${qrCode}`)
+      .maybeSingle();
 
     if (error || !item) {
       return res.status(404).json({ message: 'Invalid ticket or ticket not found', status: 'invalid' });
+    }
+
+    // Security check: only the organizer of this event (or ADMIN) is authorized to scan
+    const eventOrganizerId = item.ticket?.event?.organizerId;
+    const isAuthorized = req.user?.role === 'ADMIN' || (eventOrganizerId && eventOrganizerId === userId);
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        message: 'You are not authorized to scan this ticket',
+        status: 'unauthorized',
+      });
     }
 
     const paymentRef = Array.isArray(item.order?.payment)
@@ -589,9 +647,11 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     };
 
     if (item.isUsed) {
-      return res.status(200).json({ 
-        message: 'This ticket has already been used and checked in.', 
+      return res.status(400).json({ 
+        message: 'This ticket has already been used', 
         status: 'used',
+        isUsed: true,
+        usedAt: item.updatedAt,
         attendee,
       });
     }
@@ -608,7 +668,7 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     // POST/PUT request: Confirm check-in / mark as used
     const { error: updateErr } = await supabase
       .from('OrderItem')
-      .update({ isUsed: true })
+      .update({ isUsed: true, updatedAt: new Date().toISOString() })
       .eq('id', item.id);
     if (updateErr) throw updateErr;
 
