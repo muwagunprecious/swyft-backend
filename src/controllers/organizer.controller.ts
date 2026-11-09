@@ -401,7 +401,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
 
     // If lite query, omit massive base64 bannerImage strings to prevent timeouts
     const selectFields = isLite
-      ? 'id, title, date, location, isSuspended, isVotingEnabled, isVotingPaid, voteCost, Ticket(*)'
+      ? 'id, title, date, location, isSuspended, isTicketSalesClosed, isVotingEnabled, isVotingPaid, voteCost, Ticket(*)'
       : '*, Ticket(*)';
 
     const { data: events, error } = await supabase
@@ -463,7 +463,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
         title: event.title,
         description: isLite ? undefined : event.description,
         date: event.date,
-        status: event.status || (event.isSuspended ? 'SUSPENDED' : 'PUBLISHED'),
+        status: event.status || (event.isSuspended ? 'SUSPENDED' : event.isTicketSalesClosed ? 'SALES CLOSED' : isPassed ? 'ENDED' : 'PUBLISHED'),
         bannerImage: isLite ? undefined : event.bannerImage,
         location: event.location,
         sold,
@@ -473,6 +473,7 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
         isVotingPaid: event.isVotingPaid,
         voteCost: event.voteCost,
         isPassed,
+        isTicketSalesClosed: Boolean(event.isTicketSalesClosed),
         tickets: tickets.map((t: any) => ({
           id: t.id,
           name: t.name,
@@ -1200,5 +1201,55 @@ export const updateTicketDiscount = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const updateTicketSalesStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizerId = req.user?.userId;
+    const role = req.user?.role;
+    if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
 
+    const { eventId } = req.params;
+    if (!eventId) return res.status(400).json({ message: 'Event ID is required' });
 
+    // Fetch event to verify ownership
+    const { data: event, error: fetchErr } = await supabase
+      .from('Event')
+      .select('id, organizerId, title, isTicketSalesClosed, isSuspended')
+      .eq('id', eventId)
+      .single();
+
+    if (fetchErr || !event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (event.organizerId !== organizerId && role !== 'ADMIN') {
+      return res.status(403).json({ message: 'You are not authorized to manage ticket sales for this event' });
+    }
+
+    const nextState = typeof req.body.isTicketSalesClosed === 'boolean'
+      ? req.body.isTicketSalesClosed
+      : !event.isTicketSalesClosed;
+
+    const { data: updatedEvent, error: updateErr } = await supabase
+      .from('Event')
+      .update({
+        isTicketSalesClosed: nextState,
+        updatedAt: new Date().toISOString()
+      })
+      .eq('id', eventId)
+      .select('*')
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    return res.status(200).json({
+      message: nextState
+        ? `Ticket sales for "${event.title}" have been closed.`
+        : `Ticket sales for "${event.title}" have been reopened.`,
+      isTicketSalesClosed: nextState,
+      event: updatedEvent,
+    });
+  } catch (error: any) {
+    console.error('Error updating ticket sales status:', error);
+    return res.status(500).json({ message: 'Failed to update ticket sales status', error: error.message });
+  }
+};

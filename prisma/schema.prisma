@@ -92,6 +92,7 @@ model Event {
   showLiveRankings   Boolean   @default(true)
   allowMultipleVotes Boolean   @default(true)
   isSuspended        Boolean   @default(false)
+  isTicketSalesClosed Boolean   @default(false)
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

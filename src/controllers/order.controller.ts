@@ -313,12 +313,19 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         return res.status(404).json({ message: `Ticket ${item.ticketId} not found` });
       }
 
-      // Check if event has ended - ticket sales close automatically
+      // Check if event has ended or ticket sales closed by organizer
       const event = (ticket as any).event;
-      if (event && isEventPassed(event.date)) {
-        return res.status(400).json({
-          message: `Ticket sales have ended because "${event.title || 'this event'}" has already ended.`,
-        });
+      if (event) {
+        if (isEventPassed(event.date)) {
+          return res.status(400).json({
+            message: `Ticket sales have ended because "${event.title || 'this event'}" has already ended.`,
+          });
+        }
+        if (event.isTicketSalesClosed) {
+          return res.status(400).json({
+            message: `Ticket sales have been closed by the organizer for "${event.title || 'this event'}".`,
+          });
+        }
       }
       
       const holds = await getActiveHoldsForTicket(ticket.id);
