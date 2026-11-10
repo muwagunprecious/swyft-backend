@@ -592,8 +592,10 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
   try {
     let rawCode = req.params.qrCode || (req.query.code as string) || '';
     // Extract code if a full URL like https://swyft-ticket.name.ng/verify?code=OTX-xxx was passed
-    const match = rawCode.match(/(?:code=|^)(OTX-[a-zA-Z0-9-]+)/i);
-    const qrCode = match ? match[1] : rawCode.trim();
+    const paramMatch = rawCode.match(/[?&]code=([a-zA-Z0-9-]+)/i);
+    const otxMatch = rawCode.match(/(OTX-[a-zA-Z0-9-]+)/i);
+    const uuidMatch = rawCode.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    const qrCode = paramMatch ? paramMatch[1] : otxMatch ? otxMatch[1] : uuidMatch ? uuidMatch[1] : rawCode.trim();
 
     if (!qrCode) {
       return res.status(400).json({ message: 'No ticket verification code provided', status: 'invalid' });

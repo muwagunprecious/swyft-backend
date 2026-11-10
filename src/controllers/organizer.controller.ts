@@ -293,8 +293,10 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     if (!id) return res.status(400).json({ message: 'Ticket identifier is required' });
 
     // Clean code if a full URL or token was passed
-    const match = id.match(/(?:code=|^)(OTX-[a-zA-Z0-9-]+)/i);
-    const lookupCode = match ? match[1] : id.trim();
+    const paramMatch = id.match(/[?&]code=([a-zA-Z0-9-]+)/i);
+    const otxMatch = id.match(/(OTX-[a-zA-Z0-9-]+)/i);
+    const uuidMatch = id.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    const lookupCode = paramMatch ? paramMatch[1] : otxMatch ? otxMatch[1] : uuidMatch ? uuidMatch[1] : id.trim();
 
     // Query OrderItem by id or qrCode
     const { data: item, error: fetchErr } = await supabase
