@@ -336,11 +336,46 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Check if ticket has already been used
+    // 1. Check if event has already passed
+    const rawEventDate = item.ticket?.event?.date;
+    if (rawEventDate) {
+      const eventDate = new Date(rawEventDate);
+      if (!isNaN(eventDate.getTime())) {
+        const endOfDay = new Date(eventDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (Date.now() > endOfDay.getTime()) {
+          const formattedDate = eventDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
+          return res.status(400).json({
+            message: `Event ended on ${formattedDate}`,
+            status: 'event_ended',
+            endedAt: rawEventDate,
+            endedDateFormatted: formattedDate,
+            attendee: {
+              id: item.id,
+              name: item.order?.user?.name || 'Valued Guest',
+              email: item.order?.user?.email || '',
+              phone: item.order?.user?.phone || '',
+              ticketType: item.ticket?.name || 'General Admission',
+              event: item.ticket?.event?.title || 'Event',
+              price: item.ticket?.price ?? 0,
+              qrCode: item.qrCode,
+              isUsed: Boolean(item.isUsed),
+            }
+          });
+        }
+      }
+    }
+
+    // 2. Check if ticket has already been used (Void on subsequent scans)
     if (item.isUsed) {
       return res.status(400).json({
-        message: 'This ticket has already been used',
-        status: 'used',
+        message: 'VOID: This ticket has already been used',
+        status: 'void',
         isUsed: true,
         attendee: {
           id: item.id,

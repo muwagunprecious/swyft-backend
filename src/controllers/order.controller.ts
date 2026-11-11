@@ -671,12 +671,37 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
       isUsed: Boolean(item.isUsed),
     };
 
+    // 1. Check if event has already passed
+    const rawEventDate = item.ticket?.event?.date;
+    if (rawEventDate) {
+      const eventDate = new Date(rawEventDate);
+      if (!isNaN(eventDate.getTime())) {
+        const endOfDay = new Date(eventDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (Date.now() > endOfDay.getTime()) {
+          const formattedDate = eventDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
+          return res.status(400).json({
+            message: `Event ended on ${formattedDate}`,
+            status: 'event_ended',
+            endedAt: rawEventDate,
+            endedDateFormatted: formattedDate,
+            attendee,
+          });
+        }
+      }
+    }
+
+    // 2. Check if ticket has already been used (Void on subsequent scans)
     if (item.isUsed) {
       return res.status(400).json({ 
-        message: 'This ticket has already been used', 
-        status: 'used',
+        message: 'VOID: This ticket has already been used', 
+        status: 'void',
         isUsed: true,
-        usedAt: item.updatedAt,
         attendee,
       });
     }
