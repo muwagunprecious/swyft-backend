@@ -1122,51 +1122,49 @@ export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
       .update({ sold: (ticket.sold || 0) + 1 })
       .eq('id', ticket.id);
 
-    // 11. Dispatch Emails asynchronously via Resend
-    void (async () => {
-      try {
-        const formattedDate = event.date
-          ? new Date(event.date).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            })
-          : 'Event Date TBA';
+    // 11. Dispatch Emails via Resend (Awaited for serverless environments)
+    try {
+      const formattedDate = event.date
+        ? new Date(event.date).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })
+        : 'Event Date TBA';
 
-        // Order Receipt Email
-        await sendOrderReceiptEmail({
-          email: cleanEmail,
-          name: cleanName,
-          eventName: event.title,
-          reference,
-          amount: 0,
-          orderId: order.id,
-          phone: phone?.trim() || undefined,
-          items: [{ name: `${ticket.name} (Complimentary Pass)`, ticketName: ticket.name, quantity: 1, price: 0 }]
-        });
+      // Order Receipt Email
+      await sendOrderReceiptEmail({
+        email: cleanEmail,
+        name: cleanName,
+        eventName: event.title,
+        reference,
+        amount: 0,
+        orderId: order.id,
+        phone: phone?.trim() || undefined,
+        items: [{ name: `${ticket.name} (Complimentary Pass)`, ticketName: ticket.name, quantity: 1, price: 0 }]
+      });
 
-        await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 200));
 
-        // Official QR Ticket Pass with PDF attachment
-        await sendTicketPassEmail({
-          email: cleanEmail,
-          name: cleanName,
-          eventName: event.title,
-          ticketType: `${ticket.name} (Complimentary Pass)`,
-          venue: event.location || 'Venue TBA',
-          date: formattedDate,
-          verificationId: qrCode,
-          reference,
-          phone: phone?.trim() || undefined,
-          bannerImage: event.bannerImage || event.flyerImage,
-        });
+      // Official QR Ticket Pass with PDF attachment
+      await sendTicketPassEmail({
+        email: cleanEmail,
+        name: cleanName,
+        eventName: event.title,
+        ticketType: `${ticket.name} (Complimentary Pass)`,
+        venue: event.location || 'Venue TBA',
+        date: formattedDate,
+        verificationId: qrCode,
+        reference,
+        phone: phone?.trim() || undefined,
+        bannerImage: event.bannerImage || event.flyerImage,
+      });
 
-        console.log(`🎟️ Free ticket (${ticket.name}) successfully issued and emailed to ${cleanEmail}`);
-      } catch (emailErr: any) {
-        console.error('❌ Failed to email free ticket:', emailErr.message);
-      }
-    })();
+      console.log(`🎟️ Free ticket (${ticket.name}) successfully issued and emailed to ${cleanEmail}`);
+    } catch (emailErr: any) {
+      console.error('❌ Failed to email free ticket:', emailErr.message);
+    }
 
     return res.status(200).json({
       message: `Free ${ticket.name} ticket sent successfully to ${cleanEmail}!`,

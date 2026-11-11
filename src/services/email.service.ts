@@ -52,6 +52,8 @@ const sendWithRetry = async (mailOptions: any, maxRetries = 3): Promise<any> => 
       const attachments = mailOptions.attachments?.map((att: any) => ({
         filename: att.filename,
         content: Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content),
+        contentType: att.contentType,
+        contentId: att.cid || att.contentId,
       }));
 
       const toAddress = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
@@ -335,22 +337,34 @@ export const sendTicketPassEmail = async ({
     let bannerSrc: string | null = null;
     if (bannerImage) {
       if (bannerImage.startsWith('data:image/')) {
-        const matches = bannerImage.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        if (matches) {
-          const mimeType = matches[1];
-          const ext = mimeType.split('/')[1] || 'jpg';
-          const imageBuffer = Buffer.from(matches[2], 'base64');
-          attachments.push({
-            filename: `event-banner.${ext}`,
-            content: imageBuffer,
-            cid: 'event-banner-image',
-            contentType: mimeType,
-            contentDisposition: 'inline',
-          });
-          bannerSrc = 'cid:event-banner-image';
+        try {
+          const commaIdx = bannerImage.indexOf(',');
+          if (commaIdx !== -1) {
+            const header = bannerImage.slice(0, commaIdx);
+            const base64Data = bannerImage.slice(commaIdx + 1).replace(/\s/g, '');
+            const mimeMatch = header.match(/data:([^;]+)/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+            const rawExt = mimeType.split('/')[1] || 'jpg';
+            const ext = rawExt.includes('svg') ? 'svg' : rawExt.includes('png') ? 'png' : 'jpg';
+            const imageBuffer = Buffer.from(base64Data, 'base64');
+            attachments.push({
+              filename: `event-banner.${ext}`,
+              content: imageBuffer,
+              cid: 'event-banner-image',
+              contentType: mimeType,
+              contentDisposition: 'inline',
+            });
+            bannerSrc = 'cid:event-banner-image';
+          }
+        } catch (bannerErr) {
+          console.error('Error processing banner image for email attachment:', bannerErr);
         }
       } else if (bannerImage.startsWith('http://') || bannerImage.startsWith('https://')) {
-        bannerSrc = bannerImage;
+        if (bannerImage.includes('localhost') || bannerImage.includes('127.0.0.1')) {
+          bannerSrc = 'https://swyft-ticket.name.ng/images/party.png';
+        } else {
+          bannerSrc = bannerImage;
+        }
       } else if (bannerImage.startsWith('/')) {
         bannerSrc = `https://swyft-ticket.name.ng${bannerImage}`;
       }

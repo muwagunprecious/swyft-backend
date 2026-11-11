@@ -50,7 +50,7 @@ const dispatchPostPaymentEmails = async (payment: any) => {
       }
 
       // 2. Pause 2s between buyer emails to prevent spam flags
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 200));
 
       // 3. Send Ticket Pass Email with attached PDF SECOND
       for (const item of orderItems) {
@@ -572,9 +572,11 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
     }
 
     // Dispatch emails in background: Receipt FIRST, Ticket + downloadable PDF SECOND
-    dispatchPostPaymentEmails(payment).catch(err => {
+    try {
+      await dispatchPostPaymentEmails(payment);
+    } catch (err) {
       console.error("⚠️ Background email dispatch failed:", err);
-    });
+    }
 
     console.log(`[verifyPayment] Payment processing completed successfully for reference: ${reference}`);
     res.status(200).json({ message: 'Payment successful', orderId: payment.orderId });
