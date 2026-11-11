@@ -1159,6 +1159,7 @@ export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
           verificationId: qrCode,
           reference,
           phone: phone?.trim() || undefined,
+          bannerImage: event.bannerImage || event.flyerImage,
         });
 
         console.log(`🎟️ Free ticket (${ticket.name}) successfully issued and emailed to ${cleanEmail}`);

@@ -273,6 +273,7 @@ export interface SendTicketParams {
   reference: string;
   phone?: string;
   university?: string;
+  bannerImage?: string;
 }
 
 /**
@@ -289,12 +290,13 @@ export const sendTicketPassEmail = async ({
   reference,
   phone,
   university,
+  bannerImage,
 }: SendTicketParams) => {
   try {
     // 1. Generate QR Code image buffer pointing to verification page on swyft-ticket.name.ng
     const qrTargetUrl = `https://swyft-ticket.name.ng/verify?code=${encodeURIComponent(verificationId)}`;
     const qrBuffer = await QRCode.toBuffer(qrTargetUrl, {
-      width: 250,
+      width: 320,
       margin: 1,
       color: {
         dark: '#0a0a0a',
@@ -314,6 +316,46 @@ export const sendTicketPassEmail = async ({
       university,
     });
 
+    // 3. Setup inline attachments (QR code + PDF + optional banner)
+    const attachments: any[] = [
+      {
+        filename: 'ticket-qr.png',
+        content: qrBuffer,
+        cid: 'ticket-qr-code',
+        contentType: 'image/png',
+        contentDisposition: 'inline',
+      },
+      {
+        filename: `ticket-${verificationId}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ];
+
+    let bannerSrc: string | null = null;
+    if (bannerImage) {
+      if (bannerImage.startsWith('data:image/')) {
+        const matches = bannerImage.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = matches[1];
+          const ext = mimeType.split('/')[1] || 'jpg';
+          const imageBuffer = Buffer.from(matches[2], 'base64');
+          attachments.push({
+            filename: `event-banner.${ext}`,
+            content: imageBuffer,
+            cid: 'event-banner-image',
+            contentType: mimeType,
+            contentDisposition: 'inline',
+          });
+          bannerSrc = 'cid:event-banner-image';
+        }
+      } else if (bannerImage.startsWith('http://') || bannerImage.startsWith('https://')) {
+        bannerSrc = bannerImage;
+      } else if (bannerImage.startsWith('/')) {
+        bannerSrc = `https://swyft-ticket.name.ng${bannerImage}`;
+      }
+    }
+
     const textContent = `Hi ${name},\n\nHere is your official admission pass for ${eventName}.\n\nDate: ${date}\nVenue: ${venue} ${university ? `• ${university}` : ''}\nTicket Tier: ${ticketType}\nBooking Reference: ${reference}\nVerification Token: ${verificationId}\n\nPresent this verification token or your QR code (see attached printable PDF) at the gate for admission.\n\nThank you for choosing SWYFT!`;
 
     const mailOptions = {
@@ -326,106 +368,174 @@ export const sendTicketPassEmail = async ({
         'X-Auto-Response-Suppress': 'OOF, AutoReply',
       },
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${eventName} Admission Pass</title>
+        </head>
+        <body style="margin: 0; padding: 24px 12px; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #fafafa; -webkit-font-smoothing: antialiased;">
           
-          <!-- Header -->
-          <div style="background-color: #0a0a0a; padding: 32px 24px; text-align: center; color: #ffffff;">
-            <h1 style="margin: 0; font-size: 28px; font-weight: 300; letter-spacing: 0.05em; color: #fafafa;">SWYFT</h1>
-            <p style="margin: 6px 0 0 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em;">Official Admission Pass</p>
-          </div>
-          
-          <!-- Content -->
-          <div style="padding: 32px 24px;">
-            <h2 style="margin-top: 0; color: #111827; font-size: 20px; font-weight: 600;">Hi ${name},</h2>
-            <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
-              Here is your official admission pass for <strong>${eventName}</strong>. A scannable PDF is attached to this email for your convenience.
-            </p>
+          <!-- Outer Card Container -->
+          <div style="max-width: 580px; margin: 0 auto; background-color: #121212; border: 1px solid #262626; border-radius: 20px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.7);">
             
-            <!-- Event Card Container -->
-            <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; margin-bottom: 28px;">
+            <!-- Top Brand Bar -->
+            <div style="background-color: #0d0d0d; padding: 20px 24px; border-bottom: 1px solid #222222;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <div style="display: inline-flex; align-items: center;">
+                      <span style="font-size: 22px; font-weight: 900; letter-spacing: 0.04em; color: #ffffff;">SWYFT</span>
+                      <span style="background-color: #d1410c; color: #ffffff; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-left: 8px;">TICKETS</span>
+                    </div>
+                  </td>
+                  <td style="text-align: right; vertical-align: middle;">
+                    <span style="color: #9ca3af; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;">Official Pass</span>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Event Banner Image -->
+            ${bannerSrc ? `
+              <div style="width: 100%; max-height: 240px; overflow: hidden; background-color: #171717; text-align: center; border-bottom: 1px solid #262626;">
+                <img src="${bannerSrc}" alt="${eventName}" style="width: 100%; max-height: 240px; object-fit: cover; display: block; border: 0;" />
+              </div>
+            ` : `
+              <div style="width: 100%; height: 6px; background-color: #d1410c;"></div>
+            `}
+
+            <!-- Body Padding Area -->
+            <div style="padding: 28px 24px 20px 24px;">
               
-              <!-- Ticket Upper Banner -->
-              <div style="background-color: #f9fafb; padding: 20px; border-bottom: 1px dashed #e5e7eb;">
-                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">
-                  ${date.toUpperCase()}
-                </p>
-                <h3 style="margin: 0 0 8px 0; color: #111827; font-size: 18px; font-weight: 700; line-height: 1.3;">
-                  ${eventName}
-                </h3>
-                <p style="margin: 0; color: #6b7280; font-size: 13px;">
-                  📍 ${venue} ${university ? `• ${university}` : ''}
-                </p>
+              <!-- Greeting -->
+              <h2 style="margin: 0 0 8px 0; color: #ffffff; font-size: 19px; font-weight: 700;">Hi ${name},</h2>
+              <p style="margin: 0 0 24px 0; color: #9ca3af; font-size: 13px; line-height: 1.6;">
+                Here is your official digital admission pass for <strong style="color: #fafafa;">${eventName}</strong>. Present the scannable QR pass below at the gate for fast check-in.
+              </p>
+
+              <!-- Digital Ticket Card (Swyft Dark UI) -->
+              <div style="background-color: #171717; border: 1px solid #2e2e2e; border-radius: 18px; overflow: hidden; margin-bottom: 24px;">
+                
+                <!-- Ticket Upper Section -->
+                <div style="padding: 22px 24px; background-color: #1b1b1b; border-bottom: 1px dashed #333333;">
+                  
+                  <div style="margin-bottom: 10px;">
+                    <span style="display: inline-block; background-color: rgba(209,65,12,0.18); border: 1px solid rgba(209,65,12,0.45); color: #fb923c; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
+                      🎟️ ${ticketType}
+                    </span>
+                  </div>
+
+                  <h1 style="margin: 0 0 12px 0; color: #ffffff; font-size: 22px; font-weight: 800; line-height: 1.3;">
+                    ${eventName}
+                  </h1>
+
+                  <div style="font-size: 13px; line-height: 1.5;">
+                    <p style="margin: 0 0 4px 0; color: #fb923c; font-weight: 700;">
+                      📅 ${date}
+                    </p>
+                    <p style="margin: 0; color: #9ca3af;">
+                      📍 ${venue}${university ? ` • ${university}` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Ticket Details Key-Value Grid -->
+                <div style="padding: 18px 24px; border-bottom: 1px dashed #333333; background-color: #171717;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <tr>
+                      <td style="padding: 6px 0; color: #9ca3af; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Attendee</td>
+                      <td style="padding: 6px 0; color: #fafafa; font-weight: 700; text-align: right;">${name}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; color: #9ca3af; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Ticket Tier</td>
+                      <td style="padding: 6px 0; color: #fb923c; font-weight: 700; text-align: right;">${ticketType}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; color: #9ca3af; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Booking Reference</td>
+                      <td style="padding: 6px 0; font-family: monospace; color: #34d399; font-weight: 700; text-align: right; letter-spacing: 0.05em;">${reference}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 6px 0; color: #9ca3af; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Gate Admission</td>
+                      <td style="padding: 6px 0; color: #10b981; font-weight: 700; text-align: right;">● Ready for Entry</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- QR Code Admission Pass Area -->
+                <div style="padding: 26px 24px; text-align: center; background-color: #171717;">
+                  
+                  <p style="margin: 0 0 14px 0; font-size: 11px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;">
+                    Official Gate Scan Pass
+                  </p>
+
+                  <!-- White QR Card Container -->
+                  <div style="display: inline-block; padding: 14px; background-color: #ffffff; border-radius: 18px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); margin-bottom: 18px;">
+                    <a href="${qrTargetUrl}" target="_blank" style="text-decoration: none; display: block;" title="Click or scan to verify ticket pass">
+                      <img src="cid:ticket-qr-code" alt="Scan Ticket QR Pass" width="200" height="200" style="display: block; margin: 0 auto; border: 0; width: 200px; height: 200px;" />
+                    </a>
+                  </div>
+
+                  <!-- Verification Token Monospace Badge -->
+                  <div style="margin-bottom: 14px;">
+                    <p style="margin: 0 0 6px 0; font-size: 10px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">
+                      Verification Token
+                    </p>
+                    <div style="display: inline-block; background-color: #0d0d0d; border: 1px solid #333333; border-radius: 10px; padding: 8px 20px;">
+                      <code style="font-family: monospace; font-size: 15px; color: #f97316; font-weight: 800; letter-spacing: 0.08em;">
+                        ${verificationId}
+                      </code>
+                    </div>
+                  </div>
+
+                  <p style="margin: 0 auto 20px auto; font-size: 12px; color: #9ca3af; line-height: 1.5; max-width: 380px;">
+                    Present this QR pass on your mobile device at the entrance. The organizer will scan it to verify and admit you instantly.
+                  </p>
+
+                  <div>
+                    <a href="${qrTargetUrl}" target="_blank" style="display: inline-block; background-color: #d1410c; color: #ffffff; padding: 13px 32px; border-radius: 12px; font-size: 13px; font-weight: 800; text-decoration: none; letter-spacing: 0.02em; box-shadow: 0 4px 16px rgba(209,65,12,0.4);">
+                      Open Digital Pass Online →
+                    </a>
+                  </div>
+
+                </div>
+
               </div>
 
-              <!-- Ticket Info Grid -->
-              <div style="padding: 20px; border-bottom: 1px dashed #e5e7eb;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <!-- PDF Attachment Notice Box -->
+              <div style="background-color: #171717; border: 1px solid #2e2e2e; border-radius: 14px; padding: 16px 20px; margin-bottom: 24px;">
+                <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 5px 0; color: #6b7280;">Attendee:</td>
-                    <td style="padding: 5px 0; font-weight: 600; color: #111827; text-align: right;">${name}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 5px 0; color: #6b7280;">Ticket Tier:</td>
-                    <td style="padding: 5px 0; font-weight: 600; color: #111827; text-align: right;">${ticketType}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 5px 0; color: #6b7280;">Booking Reference:</td>
-                    <td style="padding: 5px 0; font-family: monospace; font-weight: 600; color: #111827; text-align: right;">${reference}</td>
+                    <td style="width: 36px; vertical-align: middle; font-size: 22px;">📎</td>
+                    <td style="vertical-align: middle;">
+                      <strong style="color: #fafafa; font-size: 13px; display: block; margin-bottom: 2px;">Print-Ready Ticket PDF Attached</strong>
+                      <span style="color: #9ca3af; font-size: 12px;">A high-resolution PDF pass (<code style="color: #fb923c; font-family: monospace;">ticket-${verificationId}.pdf</code>) is attached for offline access or printing.</span>
+                    </td>
                   </tr>
                 </table>
               </div>
 
-              <!-- QR Code Check-in Area -->
-              <div style="padding: 24px; text-align: center; background-color: #ffffff;">
-                <div style="display: inline-block; padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; margin-bottom: 14px;">
-                  <img src="data:image/png;base64,${qrBuffer.toString('base64')}" alt="Admission QR Code" width="180" height="180" style="display: block; margin: 0 auto; border: 0;" />
-                </div>
-                
-                <p style="margin: 0 0 4px 0; font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
-                  Verification Token
-                </p>
-                <code style="font-family: monospace; font-size: 16px; color: #111827; font-weight: 700; background-color: #f3f4f6; padding: 6px 14px; border-radius: 8px; border: 1px solid #e5e7eb; display: inline-block; word-break: break-all;">
-                  ${verificationId}
-                </code>
-                
-                <p style="margin: 16px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.4;">
-                  Present this QR code or provide the Verification Token to event staff at the gate for fast entry check-in.
+              <!-- Footer -->
+              <div style="border-top: 1px solid #222222; padding-top: 20px; text-align: center;">
+                <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #71717a;">SWYFT Ticketing Platform</p>
+                <p style="margin: 0; font-size: 11px; color: #52525b; line-height: 1.5;">
+                  Need help? Contact support at <a href="mailto:${gmailUser}" style="color: #d1410c; text-decoration: none;">${gmailUser}</a>.<br>
+                  © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
                 </p>
               </div>
 
             </div>
 
-            <!-- PDF Attachment Callout -->
-            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px;">
-              <span style="font-size: 20px;">📎</span>
-              <div>
-                <strong style="color: #111827; font-size: 13px; display: block;">Print-Ready Ticket PDF Attached</strong>
-                <span style="color: #6b7280; font-size: 12px;">
-                  A scannable PDF (<code>ticket-${verificationId}.pdf</code>) is attached to this email.
-                </span>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <p style="font-size: 11px; color: #9ca3af; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 16px; line-height: 1.5;">
-              This is a transactional confirmation from Swyft for your purchase.<br>
-              Questions? Contact support at ${gmailUser}.<br>
-              © ${new Date().getFullYear()} SWYFT Technologies. All rights reserved.
-            </p>
           </div>
-        </div>
+        </body>
+        </html>
       `,
-      attachments: [
-        {
-          filename: `ticket-${verificationId}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf',
-        },
-      ],
+      attachments,
     };
 
     const info = await sendWithRetry(mailOptions);
-    console.log(`✉️ Ticket pass email with PDF attached sent to ${email} (Message ID: ${info.messageId})`);
+    console.log(`✉️ Ticket pass email with banner & CID QR sent to ${email} (Message ID: ${info.messageId})`);
     return info;
   } catch (error) {
     console.error('❌ Error sending ticket pass email:', error);

@@ -77,6 +77,7 @@ const dispatchPostPaymentEmails = async (payment: any) => {
             reference: payment.reference,
             phone: user.phone || undefined,
             university: user.university || undefined,
+            bannerImage: event?.bannerImage || event?.flyerImage,
           });
           console.log(`✅ Ticket pass with PDF attachment sent to ${user.email}`);
         } catch (ticketErr) {
