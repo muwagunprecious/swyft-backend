@@ -299,11 +299,27 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     const lookupCode = paramMatch ? paramMatch[1] : otxMatch ? otxMatch[1] : uuidMatch ? uuidMatch[1] : id.trim();
 
     // Query OrderItem by id or qrCode
-    const { data: item, error: fetchErr } = await supabase
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupCode);
+    const strippedCode = lookupCode.startsWith('OTX-') ? lookupCode.slice(4) : lookupCode;
+    const isStrippedUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(strippedCode);
+
+    let itemQuery = supabase
       .from('OrderItem')
-      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*))')
-      .or(`id.eq.${lookupCode},qrCode.eq.${lookupCode}`)
-      .maybeSingle();
+      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*))');
+
+    if (isUUID) {
+      itemQuery = itemQuery.or(`id.eq.${lookupCode},qrCode.eq.${lookupCode},qrCode.eq.OTX-${lookupCode}`);
+    } else if (isStrippedUUID) {
+      itemQuery = itemQuery.or(`id.eq.${strippedCode},qrCode.eq.${lookupCode},qrCode.eq.${strippedCode}`);
+    } else {
+      itemQuery = itemQuery.eq('qrCode', lookupCode);
+    }
+
+    const { data: item, error: fetchErr } = await itemQuery.maybeSingle();
+
+    if (fetchErr) {
+      console.error('Error fetching OrderItem in verifyTicket:', fetchErr);
+    }
 
     if (fetchErr || !item) {
       return res.status(404).json({ message: 'Invalid ticket: no matching record found.', status: 'invalid' });
@@ -326,7 +342,6 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
         message: 'This ticket has already been used',
         status: 'used',
         isUsed: true,
-        usedAt: item.updatedAt,
         attendee: {
           id: item.id,
           name: item.order?.user?.name || 'Valued Guest',
@@ -334,6 +349,7 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
           phone: item.order?.user?.phone || '',
           ticketType: item.ticket?.name || 'General Admission',
           event: item.ticket?.event?.title || 'Event',
+          price: item.ticket?.price ?? 0,
           qrCode: item.qrCode,
         }
       });
@@ -342,10 +358,13 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     // If not used, mark as used!
     const { error: updateErr } = await supabase
       .from('OrderItem')
-      .update({ isUsed: true, updatedAt: new Date().toISOString() })
+      .update({ isUsed: true })
       .eq('id', item.id);
 
-    if (updateErr) throw updateErr;
+    if (updateErr) {
+      console.error('Error updating OrderItem.isUsed:', updateErr);
+      throw updateErr;
+    }
 
     return res.status(200).json({
       message: 'Ticket valid - Checked In Successfully! 🎉',
@@ -357,6 +376,7 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
         phone: item.order?.user?.phone || '',
         ticketType: item.ticket?.name || 'General Admission',
         event: item.ticket?.event?.title || 'Event',
+        price: item.ticket?.price ?? 0,
         qrCode: item.qrCode,
         isUsed: true,
       }

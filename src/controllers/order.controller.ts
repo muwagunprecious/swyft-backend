@@ -610,11 +610,27 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const { data: item, error } = await supabase
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrCode);
+    const strippedCode = qrCode.startsWith('OTX-') ? qrCode.slice(4) : qrCode;
+    const isStrippedUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(strippedCode);
+
+    let itemQuery = supabase
       .from('OrderItem')
-      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*), payment:Payment(*))')
-      .or(`qrCode.eq.${qrCode},id.eq.${qrCode}`)
-      .maybeSingle();
+      .select('*, ticket:Ticket(*, event:Event(*)), order:Order(*, user:User(*), payment:Payment(*))');
+
+    if (isUUID) {
+      itemQuery = itemQuery.or(`id.eq.${qrCode},qrCode.eq.${qrCode},qrCode.eq.OTX-${qrCode}`);
+    } else if (isStrippedUUID) {
+      itemQuery = itemQuery.or(`id.eq.${strippedCode},qrCode.eq.${qrCode},qrCode.eq.${strippedCode}`);
+    } else {
+      itemQuery = itemQuery.eq('qrCode', qrCode);
+    }
+
+    const { data: item, error } = await itemQuery.maybeSingle();
+
+    if (error) {
+      console.error('Error fetching OrderItem in verifyTicket:', error);
+    }
 
     if (error || !item) {
       return res.status(404).json({ message: 'Invalid ticket or ticket not found', status: 'invalid' });
@@ -677,9 +693,12 @@ export const verifyTicket = async (req: AuthRequest, res: Response) => {
     // POST/PUT request: Confirm check-in / mark as used
     const { error: updateErr } = await supabase
       .from('OrderItem')
-      .update({ isUsed: true, updatedAt: new Date().toISOString() })
+      .update({ isUsed: true })
       .eq('id', item.id);
-    if (updateErr) throw updateErr;
+    if (updateErr) {
+      console.error('Error updating OrderItem.isUsed:', updateErr);
+      throw updateErr;
+    }
 
     attendee.isUsed = true;
 
