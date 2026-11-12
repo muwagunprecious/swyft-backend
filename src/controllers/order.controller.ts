@@ -30,9 +30,44 @@ const dispatchPostPaymentEmails = async (payment: any) => {
     const firstEvent = orderItems[0]?.ticket?.event;
     const eventName = firstEvent?.title || 'Campus Event';
 
-    // 1. Send Order Receipt Email FIRST to the buyer
     if (user && user.email) {
-      console.log(`🚀 Dispatching receipt email FIRST to ${user.email}...`);
+      // 1. Send Ticket Pass Email with QR code and event pass FIRST!
+      for (const item of orderItems) {
+        try {
+          const event = item.ticket?.event;
+          const formattedDate = event?.date
+            ? new Date(event.date).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : 'Event Date TBA';
+
+          console.log(`🚀 Dispatching ticket pass email FIRST to buyer ${user.email} (Token: ${item.qrCode})...`);
+          await sendTicketPassEmail({
+            email: user.email,
+            name: user.name || 'Valued Guest',
+            eventName: event?.title || 'Campus Event',
+            ticketType: item.ticket?.name || 'Admission Pass',
+            venue: event?.location || 'Campus Center',
+            date: formattedDate,
+            verificationId: item.qrCode,
+            reference: payment.reference,
+            phone: user.phone || undefined,
+            university: user.university || undefined,
+            bannerImage: event?.bannerImage || event?.flyerImage,
+          });
+          console.log(`✅ Ticket pass email with QR pass sent to ${user.email}`);
+        } catch (ticketErr) {
+          console.error(`❌ Failed to send ticket pass email to ${user.email}:`, ticketErr);
+        }
+      }
+
+      await new Promise((r) => setTimeout(r, 200));
+
+      // 2. Send Order Receipt Email SECOND to the buyer
+      console.log(`🚀 Dispatching receipt email SECOND to ${user.email}...`);
       try {
         await sendOrderReceiptEmail({
           email: user.email,
@@ -47,42 +82,6 @@ const dispatchPostPaymentEmails = async (payment: any) => {
         console.log(`✅ Order receipt email sent successfully to ${user.email}`);
       } catch (receiptErr) {
         console.error(`❌ Failed to send receipt email to ${user.email}:`, receiptErr);
-      }
-
-      // 2. Pause 2s between buyer emails to prevent spam flags
-      await new Promise((r) => setTimeout(r, 200));
-
-      // 3. Send Ticket Pass Email with attached PDF SECOND
-      for (const item of orderItems) {
-        try {
-          const event = item.ticket?.event;
-          const formattedDate = event?.date
-            ? new Date(event.date).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })
-            : 'Event Date TBA';
-
-          console.log(`🚀 Dispatching ticket pass email to buyer ${user.email} (Token: ${item.qrCode})...`);
-          await sendTicketPassEmail({
-            email: user.email,
-            name: user.name || 'Valued Guest',
-            eventName: event?.title || 'Campus Event',
-            ticketType: item.ticket?.name || 'Admission Pass',
-            venue: event?.location || 'Campus Center',
-            date: formattedDate,
-            verificationId: item.qrCode,
-            reference: payment.reference,
-            phone: user.phone || undefined,
-            university: user.university || undefined,
-            bannerImage: event?.bannerImage || event?.flyerImage,
-          });
-          console.log(`✅ Ticket pass with PDF attachment sent to ${user.email}`);
-        } catch (ticketErr) {
-          console.error(`❌ Failed to send ticket pass email to ${user.email}:`, ticketErr);
-        }
       }
     } else {
       console.warn('⚠️ dispatchPostPaymentEmails: No recipient email found for order', payment.orderId);

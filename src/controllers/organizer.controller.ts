@@ -1133,21 +1133,7 @@ export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
           })
         : 'Event Date TBA';
 
-      // Order Receipt Email
-      await sendOrderReceiptEmail({
-        email: cleanEmail,
-        name: cleanName,
-        eventName: event.title,
-        reference,
-        amount: 0,
-        orderId: order.id,
-        phone: phone?.trim() || undefined,
-        items: [{ name: `${ticket.name} (Complimentary Pass)`, ticketName: ticket.name, quantity: 1, price: 0 }]
-      });
-
-      await new Promise((r) => setTimeout(r, 200));
-
-      // Official QR Ticket Pass with PDF attachment
+      // 1. Official QR Ticket Pass with PDF attachment FIRST
       await sendTicketPassEmail({
         email: cleanEmail,
         name: cleanName,
@@ -1159,6 +1145,20 @@ export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
         reference,
         phone: phone?.trim() || undefined,
         bannerImage: event.bannerImage || event.flyerImage,
+      });
+
+      await new Promise((r) => setTimeout(r, 200));
+
+      // 2. Order Receipt Email SECOND
+      await sendOrderReceiptEmail({
+        email: cleanEmail,
+        name: cleanName,
+        eventName: event.title,
+        reference,
+        amount: 0,
+        orderId: order.id,
+        phone: phone?.trim() || undefined,
+        items: [{ name: `${ticket.name} (Complimentary Pass)`, ticketName: ticket.name, quantity: 1, price: 0 }]
       });
 
       console.log(`🎟️ Free ticket (${ticket.name}) successfully issued and emailed to ${cleanEmail}`);

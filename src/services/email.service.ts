@@ -53,7 +53,9 @@ const sendWithRetry = async (mailOptions: any, maxRetries = 3): Promise<any> => 
         filename: att.filename,
         content: Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content),
         contentType: att.contentType,
+        content_type: att.contentType,
         contentId: att.cid || att.contentId,
+        content_id: att.cid || att.contentId,
       }));
 
       const toAddress = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
@@ -306,19 +308,24 @@ export const sendTicketPassEmail = async ({
       },
     });
 
-    // 2. Generate downloadable PDF ticket pass buffer
-    const pdfBuffer = await generateTicketPdf({
-      eventName,
-      ticketType,
-      attendeeName: name,
-      verificationId,
-      reference,
-      date,
-      venue,
-      university,
-    });
+    // 2. Generate downloadable PDF ticket pass buffer (with safe fallback)
+    let pdfBuffer: Buffer | null = null;
+    try {
+      pdfBuffer = await generateTicketPdf({
+        eventName,
+        ticketType,
+        attendeeName: name,
+        verificationId,
+        reference,
+        date,
+        venue,
+        university,
+      });
+    } catch (pdfErr: any) {
+      console.warn(`⚠️ PDF ticket pass generation skipped (${pdfErr?.message || pdfErr}). Proceeding with QR email pass.`);
+    }
 
-    // 3. Setup inline attachments (QR code + PDF + optional banner)
+    // 3. Setup inline attachments (QR code + PDF if available + optional banner)
     const attachments: any[] = [
       {
         filename: 'ticket-qr.png',
@@ -327,12 +334,15 @@ export const sendTicketPassEmail = async ({
         contentType: 'image/png',
         contentDisposition: 'inline',
       },
-      {
+    ];
+
+    if (pdfBuffer && pdfBuffer.length > 0) {
+      attachments.push({
         filename: `ticket-${verificationId}.pdf`,
         content: pdfBuffer,
         contentType: 'application/pdf',
-      },
-    ];
+      });
+    }
 
     let bannerSrc: string | null = null;
     if (bannerImage) {
@@ -518,6 +528,7 @@ export const sendTicketPassEmail = async ({
               </div>
 
               <!-- PDF Attachment Notice Box -->
+              ${pdfBuffer ? `
               <div style="background-color: #171717; border: 1px solid #2e2e2e; border-radius: 14px; padding: 16px 20px; margin-bottom: 24px;">
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
@@ -529,6 +540,7 @@ export const sendTicketPassEmail = async ({
                   </tr>
                 </table>
               </div>
+              ` : ''}
 
               <!-- Footer -->
               <div style="border-top: 1px solid #222222; padding-top: 20px; text-align: center;">
