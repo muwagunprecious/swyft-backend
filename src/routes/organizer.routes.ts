@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getStats, getSales, getEvents, getActivity, getDashboard, addContestant, addCategory, updateVotingSettings, getAttendees, verifyTicket, getWallet, requestWithdrawal, sendFreeTicket, updateTicketDiscount, updateTicketSalesStatus } from '../controllers/organizer.controller';
+import { getStats, getSales, getEvents, getActivity, getDashboard, addContestant, addCategory, deleteCategory, deleteContestant, updateVotingSettings, getAttendees, verifyTicket, getWallet, requestWithdrawal, sendFreeTicket, updateTicketDiscount, updateTicketSalesStatus } from '../controllers/organizer.controller';
 import { saveBankDetails, getBankDetails } from '../controllers/payout.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -22,6 +22,8 @@ router.get('/subaccount', getBankDetails);
 router.post('/subaccount', saveBankDetails);
 router.post('/contestants', addContestant);
 router.post('/categories', addCategory);
+router.delete('/categories/:categoryId', deleteCategory);
+router.delete('/contestants/:contestantId', deleteContestant);
 router.put('/events/:eventId/voting-settings', updateVotingSettings);
 router.get('/attendees', getAttendees);
 router.post('/verify/:id', verifyTicket);

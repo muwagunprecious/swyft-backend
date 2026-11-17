@@ -56,6 +56,7 @@ const dispatchPostPaymentEmails = async (payment: any) => {
             reference: payment.reference,
             phone: user.phone || undefined,
             university: user.university || undefined,
+            eventId: event?.id,
             bannerImage: event?.bannerImage || event?.flyerImage,
           });
           console.log(`✅ Ticket pass email with QR pass sent to ${user.email}`);

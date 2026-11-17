@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { supabase } from '../config/supabase';
@@ -303,5 +304,78 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('createEvent error:', error);
     res.status(500).json({ message: 'Error creating event', details: error.message, code: error.code });
+  }
+};
+
+
+export const getEventBanner = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).send('Event ID required');
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let query = supabase.from('Event').select('bannerImage, flyerImage');
+    if (uuidRegex.test(id)) {
+      query = query.eq('id', id);
+    } else {
+      query = query.eq('slug', id);
+    }
+    const { data: event, error } = await query.maybeSingle();
+
+    const bannerImage = event?.bannerImage || event?.flyerImage;
+
+    if (error || !event || !bannerImage) {
+      return res.redirect('https://swyft-ticket.name.ng/images/party.png');
+    }
+
+    if (bannerImage.startsWith('http://') || bannerImage.startsWith('https://')) {
+      return res.redirect(bannerImage);
+    }
+
+    if (bannerImage.startsWith('data:image/')) {
+      const commaIdx = bannerImage.indexOf(',');
+      if (commaIdx !== -1) {
+        const header = bannerImage.slice(0, commaIdx);
+        const base64Data = bannerImage.slice(commaIdx + 1);
+        const mimeMatch = header.match(/data:([^;]+)/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const buffer = Buffer.from(base64Data, 'base64');
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+        return res.send(buffer);
+      }
+    }
+
+    return res.redirect('https://swyft-ticket.name.ng/images/party.png');
+  } catch (err) {
+    console.error('Error serving event banner:', err);
+    return res.redirect('https://swyft-ticket.name.ng/images/party.png');
+  }
+};
+
+export const getTicketQrImage = async (req: Request, res: Response) => {
+  try {
+    const code = (req.query.code || req.query.data) as string;
+    if (!code) return res.status(400).send('Code is required');
+
+    const qrTargetUrl = code.startsWith('http://') || code.startsWith('https://')
+      ? code
+      : `https://swyft-ticket.name.ng/verify?code=${encodeURIComponent(code)}`;
+
+    const qrBuffer = await QRCode.toBuffer(qrTargetUrl, {
+      width: 320,
+      margin: 1,
+      color: {
+        dark: '#0a0a0a',
+        light: '#ffffff',
+      },
+    });
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.send(qrBuffer);
+  } catch (err) {
+    console.error('Error generating QR image:', err);
+    return res.status(500).send('Error generating QR code');
   }
 };

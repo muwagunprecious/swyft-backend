@@ -81,10 +81,24 @@ export const getResults = async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
 
+    // Resolve eventId if it's a slug or custom ID
+    let resolvedEventId = eventId;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(eventId)) {
+      const { data: ev } = await supabase
+        .from('Event')
+        .select('id')
+        .or(`slug.eq.${eventId},id.eq.${eventId}`)
+        .maybeSingle();
+      if (ev) {
+        resolvedEventId = ev.id;
+      }
+    }
+
     const { data: results, error } = await supabase
       .from('VoteCategory')
       .select('*, contestants:Contestant(*), votes:Vote(*)')
-      .eq('eventId', eventId);
+      .eq('eventId', resolvedEventId);
 
     if (error) throw error;
 

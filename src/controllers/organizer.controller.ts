@@ -1142,6 +1142,7 @@ export const sendFreeTicket = async (req: AuthRequest, res: Response) => {
         verificationId: qrCode,
         reference,
         phone: phone?.trim() || undefined,
+        eventId: event.id,
         bannerImage: event.bannerImage || event.flyerImage,
       });
 
@@ -1305,5 +1306,79 @@ export const updateTicketSalesStatus = async (req: AuthRequest, res: Response) =
   } catch (error: any) {
     console.error('Error updating ticket sales status:', error);
     return res.status(500).json({ message: 'Failed to update ticket sales status', error: error.message });
+  }
+};
+
+export const deleteCategory = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizerId = req.user?.userId;
+    if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { categoryId } = req.params;
+    if (!categoryId) return res.status(400).json({ message: 'Category ID is required' });
+
+    // Fetch category and verify ownership
+    const { data: category, error: catErr } = await supabase
+      .from('VoteCategory')
+      .select('id, eventId, event:Event(organizerId)')
+      .eq('id', categoryId)
+      .single();
+
+    if (catErr || !category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    if ((category as any).event?.organizerId !== organizerId) {
+      return res.status(403).json({ message: 'Forbidden: You do not own this event' });
+    }
+
+    // Delete votes, contestants, then category
+    await supabase.from('Vote').delete().eq('categoryId', categoryId);
+    await supabase.from('Contestant').delete().eq('categoryId', categoryId);
+    const { error: delErr } = await supabase.from('VoteCategory').delete().eq('id', categoryId);
+
+    if (delErr) throw delErr;
+
+    res.status(200).json({ message: 'Category deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ message: 'Error deleting category', error: error.message });
+  }
+};
+
+export const deleteContestant = async (req: AuthRequest, res: Response) => {
+  try {
+    const organizerId = req.user?.userId;
+    if (!organizerId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { contestantId } = req.params;
+    if (!contestantId) return res.status(400).json({ message: 'Contestant ID is required' });
+
+    // Fetch contestant with category and event
+    const { data: contestant, error: cErr } = await supabase
+      .from('Contestant')
+      .select('id, categoryId, category:VoteCategory(id, event:Event(organizerId))')
+      .eq('id', contestantId)
+      .single();
+
+    if (cErr || !contestant) {
+      return res.status(404).json({ message: 'Contestant not found' });
+    }
+
+    const orgId = (contestant as any).category?.event?.organizerId;
+    if (orgId !== organizerId) {
+      return res.status(403).json({ message: 'Forbidden: You do not own this contestant' });
+    }
+
+    // Delete votes for contestant and then contestant
+    await supabase.from('Vote').delete().eq('contestantId', contestantId);
+    const { error: delErr } = await supabase.from('Contestant').delete().eq('id', contestantId);
+
+    if (delErr) throw delErr;
+
+    res.status(200).json({ message: 'Contestant deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting contestant:', error);
+    res.status(500).json({ message: 'Error deleting contestant', error: error.message });
   }
 };

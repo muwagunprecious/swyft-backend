@@ -268,6 +268,7 @@ export const sendOrderReceiptEmail = async ({
 
 export interface SendTicketParams {
   email: string;
+  eventId?: string;
   name: string;
   eventName: string;
   ticketType: string;
@@ -294,6 +295,7 @@ export const sendTicketPassEmail = async ({
   reference,
   phone,
   university,
+  eventId,
   bannerImage,
 }: SendTicketParams) => {
   try {
@@ -325,17 +327,8 @@ export const sendTicketPassEmail = async ({
       console.warn(`⚠️ PDF ticket pass generation skipped (${pdfErr?.message || pdfErr}). Proceeding with QR email pass.`);
     }
 
-    // 3. Setup inline attachments (QR code + PDF if available + optional banner)
-    const attachments: any[] = [
-      {
-        filename: 'ticket-qr.png',
-        content: qrBuffer,
-        cid: 'ticket-qr-code',
-        contentType: 'image/png',
-        contentDisposition: 'inline',
-      },
-    ];
-
+    // 3. Setup attachments (downloadable high-res PDF pass)
+    const attachments: any[] = [];
     if (pdfBuffer && pdfBuffer.length > 0) {
       attachments.push({
         filename: `ticket-${verificationId}.pdf`,
@@ -344,40 +337,26 @@ export const sendTicketPassEmail = async ({
       });
     }
 
+    // 4. Resolve universally compatible HTTPS image URLs for Gmail & mobile email clients
+    // (Bypasses email client base64 stripping and fragile CID boundary failures)
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&margin=10&data=${encodeURIComponent(qrTargetUrl)}`;
+
+    const backendPublicUrl = process.env.BACKEND_PUBLIC_URL || 'https://swyft-backend-five.vercel.app';
     let bannerSrc: string | null = null;
     if (bannerImage) {
-      if (bannerImage.startsWith('data:image/')) {
-        try {
-          const commaIdx = bannerImage.indexOf(',');
-          if (commaIdx !== -1) {
-            const header = bannerImage.slice(0, commaIdx);
-            const base64Data = bannerImage.slice(commaIdx + 1).replace(/\s/g, '');
-            const mimeMatch = header.match(/data:([^;]+)/);
-            const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-            const rawExt = mimeType.split('/')[1] || 'jpg';
-            const ext = rawExt.includes('svg') ? 'svg' : rawExt.includes('png') ? 'png' : 'jpg';
-            const imageBuffer = Buffer.from(base64Data, 'base64');
-            attachments.push({
-              filename: `event-banner.${ext}`,
-              content: imageBuffer,
-              cid: 'event-banner-image',
-              contentType: mimeType,
-              contentDisposition: 'inline',
-            });
-            bannerSrc = 'cid:event-banner-image';
-          }
-        } catch (bannerErr) {
-          console.error('Error processing banner image for email attachment:', bannerErr);
-        }
-      } else if (bannerImage.startsWith('http://') || bannerImage.startsWith('https://')) {
+      if (bannerImage.startsWith('http://') || bannerImage.startsWith('https://')) {
         if (bannerImage.includes('localhost') || bannerImage.includes('127.0.0.1')) {
           bannerSrc = 'https://swyft-ticket.name.ng/images/party.png';
         } else {
           bannerSrc = bannerImage;
         }
+      } else if (eventId) {
+        bannerSrc = `${backendPublicUrl}/api/events/${eventId}/banner`;
       } else if (bannerImage.startsWith('/')) {
         bannerSrc = `https://swyft-ticket.name.ng${bannerImage}`;
       }
+    } else if (eventId) {
+      bannerSrc = `${backendPublicUrl}/api/events/${eventId}/banner`;
     }
 
     const textContent = `Hi ${name},\n\nHere is your official admission pass for ${eventName}.\n\nDate: ${date}\nVenue: ${venue} ${university ? `• ${university}` : ''}\nTicket Tier: ${ticketType}\nBooking Reference: ${reference}\nVerification Token: ${verificationId}\n\nPresent this verification token or your QR code (see attached printable PDF) at the gate for admission.\n\nThank you for choosing SWYFT!`;
@@ -497,7 +476,7 @@ export const sendTicketPassEmail = async ({
                   <!-- White QR Card Container -->
                   <div style="display: inline-block; padding: 14px; background-color: #ffffff; border-radius: 18px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); margin-bottom: 18px;">
                     <a href="${qrTargetUrl}" target="_blank" style="text-decoration: none; display: block;" title="Click or scan to verify ticket pass">
-                      <img src="cid:ticket-qr-code" alt="Scan Ticket QR Pass" width="200" height="200" style="display: block; margin: 0 auto; border: 0; width: 200px; height: 200px;" />
+                      <img src="${qrImageUrl}" alt="Scan Ticket QR Pass" width="200" height="200" style="display: block; margin: 0 auto; border: 0; width: 200px; height: 200px;" />
                     </a>
                   </div>
 
