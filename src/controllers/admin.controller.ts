@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { sendOrganizerTicketSaleNotification } from '../services/email.service';
+import { syncOrganizerWallet, calculateItemPaidAmount } from '../services/wallet.service';
 
 // 1. Get Platform Statistics
 export const getStats = async (req: AuthRequest, res: Response) => {
@@ -131,8 +132,14 @@ export const getOrganizersDirectory = async (req: AuthRequest, res: Response) =>
       }
 
       for (const [orgId, orderOrgItems] of Object.entries(itemsByOrgInOrder)) {
-        // Exactly credit the actual order totalPrice paid by the buyer (handles discounts, free tickets, normal prices)
-        revByOrg[orgId] = (revByOrg[orgId] || 0) + (ord.totalPrice || 0);
+        // Apportion exact order revenue if multiple organizers share an order, or allocate full totalPrice if single organizer
+        if (orderOrgItems.length === (ord.items || []).length) {
+          revByOrg[orgId] = (revByOrg[orgId] || 0) + (Number(ord.totalPrice) || 0);
+        } else {
+          for (const entry of orderOrgItems) {
+            revByOrg[orgId] = (revByOrg[orgId] || 0) + calculateItemPaidAmount(entry.item, Number(ord.totalPrice) || 0, ord.items || []);
+          }
+        }
 
         for (const entry of orderOrgItems) {
           const { item, ticket, event } = entry;
@@ -489,23 +496,10 @@ export const releasePayout = async (req: AuthRequest, res: Response) => {
 
     if (updateErr) throw updateErr;
 
-    // Immediately deduct amount from organizer's wallet balance in User table
-    if (payout.userId && payout.amount) {
-      const { data: user } = await supabase
-        .from('User')
-        .select('walletBalance')
-        .eq('id', payout.userId)
-        .single();
-
-      const currentBalance = typeof user?.walletBalance === 'number' ? user.walletBalance : 0;
-      const newBalance = Math.max(0, currentBalance - (payout.amount || 0));
-
-      await supabase
-        .from('User')
-        .update({ walletBalance: newBalance })
-        .eq('id', payout.userId);
-
-      console.log(`💸 Payout ₦${payout.amount} released for organizer ${payout.userId}. Wallet balance updated: ₦${currentBalance} -> ₦${newBalance}`);
+    // Immediately sync organizer wallet to ensure DB balance is 100% accurate
+    if (payout.userId) {
+      await syncOrganizerWallet(payout.userId);
+      console.log(`💸 Payout ₦${payout.amount} released for organizer ${payout.userId}. Wallet strictly synced with financial ledger.`);
     }
 
     res.status(200).json({
@@ -546,6 +540,11 @@ export const rejectPayout = async (req: AuthRequest, res: Response) => {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Immediately sync organizer wallet to release pending hold
+    if (payout.userId) {
+      await syncOrganizerWallet(payout.userId);
+    }
 
     res.status(200).json({
       message: 'Payout request rejected.',

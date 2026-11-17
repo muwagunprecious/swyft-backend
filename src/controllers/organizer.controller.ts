@@ -48,21 +48,14 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     const eventIds = events.map((e: any) => e.id);
     const ticketIds = events.flatMap((e: any) => e.Ticket?.map((t: any) => t.id) || []);
 
-    // Fetch user for baseline walletBalance safeguard
-    const { data: userRec } = await supabase
-      .from('User')
-      .select('walletBalance')
-      .eq('id', organizerId)
-      .single();
-
-    // 2. Fetch live accurate wallet metrics (exact completed revenue with discounts)
+    // 2. Fetch live accurate wallet metrics (ground truth financial ledger)
     const { totalRevenue, availableBalance, withdrawnAmount, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
-    const finalAvailableBalance = Math.max(availableBalance, userRec?.walletBalance || 0);
-    const finalRevenue = Math.max(totalRevenue, finalAvailableBalance + withdrawnAmount + pendingWithdrawals);
+    const revenue = totalRevenue;
+    const walletBalance = availableBalance;
 
     if (eventIds.length === 0) {
       return res.status(200).json({ 
-        stats: { revenue: finalRevenue, walletBalance: finalAvailableBalance, withdrawnAmount, pendingWithdrawals, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
+        stats: { revenue, walletBalance, withdrawnAmount, pendingWithdrawals, ticketsSold: 0, totalVotes: 0, activeEvents: 0 }, 
         sales: [], 
         activity: [] 
       });
@@ -76,8 +69,6 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       });
     });
 
-    const revenue = finalRevenue;
-    const walletBalance = finalAvailableBalance;
 
     // Fetch VoteCategories to get categoryIds
     const { data: categories } = await supabase
@@ -912,12 +903,19 @@ export const requestWithdrawal = async (req: AuthRequest, res: Response) => {
     }
 
     // 2. Fetch live accurate wallet metrics via centralized sync
-    const { availableBalance } = await syncOrganizerWallet(organizerId);
-    const finalAvailable = Math.max(availableBalance, user?.walletBalance || 0);
+    const { availableBalance, pendingWithdrawals } = await syncOrganizerWallet(organizerId);
 
-    if (withdrawAmount > finalAvailable) {
+    // Safeguard 1: Prevent concurrent or duplicate withdrawals while a previous payout is pending
+    if (pendingWithdrawals > 0) {
       return res.status(400).json({
-        message: `Insufficient funds. Your available balance is ₦${Math.max(0, finalAvailable).toLocaleString()}.`,
+        message: `You already have a pending withdrawal request of ₦${pendingWithdrawals.toLocaleString()} under review. Please wait for it to be processed before submitting another request.`,
+      });
+    }
+
+    // Safeguard 2: Strictly enforce available balance from actual completed ticket revenue
+    if (withdrawAmount > availableBalance) {
+      return res.status(400).json({
+        message: `Insufficient funds. Your available balance is ₦${Math.max(0, availableBalance).toLocaleString()}.`,
       });
     }
 
